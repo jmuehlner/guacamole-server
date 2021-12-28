@@ -26,7 +26,7 @@
 AUTOMAKE_OPTIONS = foreign 
 ACLOCAL_AMFLAGS = -I m4
 
-noinst_LTLIBRARIES = libguac_terminal.la
+lib_LTLIBRARIES = libguac_terminal.la
 
 noinst_HEADERS =                 \
     terminal/buffer.h            \
