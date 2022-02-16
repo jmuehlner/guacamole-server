@@ -101,6 +101,18 @@ static int guac_kubernetes_lws_callback(struct lws* wsi,
             /* Allow terminal to render */
             guac_terminal_start(kubernetes_client->term);
 
+            /* Initalize and start the terminal */
+            int terminal_init_response = guac_terminal_start(
+                    kubernetes_client->term);
+
+            /* Fail if terminal init failed */
+            if (terminal_init_response != 0) {
+
+                guac_client_abort(client, GUAC_PROTOCOL_STATUS_SERVER_ERROR,
+                        "Terminal initialization failed");
+                return terminal_init_response;
+            }
+
             /* Schedule check for pending messages in case messages were added
              * to the outbound message buffer prior to the connection being
              * fully established */
@@ -240,18 +252,20 @@ void* guac_kubernetes_client_thread(void* data) {
     }
 
     /* Create terminal */
-    kubernetes_client->term = guac_terminal_create(client,
-            kubernetes_client->clipboard, settings->disable_copy,
-            settings->max_scrollback, settings->font_name, settings->font_size,
-            settings->resolution, settings->width, settings->height,
-            settings->color_scheme, settings->backspace);
+    kubernetes_client->term = guac_terminal_create(
+            client, kubernetes_client->clipboard,
+            settings->width, settings->height, settings->resolution);
 
-    /* Fail if terminal init failed */
-    if (kubernetes_client->term == NULL) {
-        guac_client_abort(client, GUAC_PROTOCOL_STATUS_SERVER_ERROR,
-                "Terminal initialization failed");
-        goto fail;
-    }
+    /* Override configurable parameters from settings */
+    guac_terminal_set_font_name(kubernetes_client->term, settings->font_name);
+    guac_terminal_set_font_size(kubernetes_client->term, settings->font_size);
+    guac_terminal_set_max_scrollback(
+            kubernetes_client->term, settings->max_scrollback);
+    guac_terminal_set_disable_copy(
+            kubernetes_client->term, settings->disable_copy);
+    guac_terminal_set_color_scheme(
+            kubernetes_client->term, settings->color_scheme);
+    guac_terminal_set_backspace(kubernetes_client->term, settings->backspace);
 
     /* Send current values of exposed arguments to owner only */
     guac_client_for_owner(client, guac_kubernetes_send_current_argv,

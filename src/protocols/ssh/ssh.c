@@ -240,17 +240,15 @@ void* ssh_client_thread(void* data) {
 
     /* Create terminal */
     ssh_client->term = guac_terminal_create(client, ssh_client->clipboard,
-            settings->disable_copy, settings->max_scrollback,
-            settings->font_name, settings->font_size, settings->resolution,
-            settings->width, settings->height, settings->color_scheme,
-            settings->backspace);
+            settings->width, settings->height, settings->resolution);
 
-    /* Fail if terminal init failed */
-    if (ssh_client->term == NULL) {
-        guac_client_abort(client, GUAC_PROTOCOL_STATUS_SERVER_ERROR,
-                "Terminal initialization failed");
-        return NULL;
-    }
+    /* Override configurable parameters from settings */
+    guac_terminal_set_font_name(ssh_client->term, settings->font_name);
+    guac_terminal_set_font_size(ssh_client->term, settings->font_size);
+    guac_terminal_set_max_scrollback(ssh_client->term, settings->max_scrollback);
+    guac_terminal_set_disable_copy(ssh_client->term, settings->disable_copy);
+    guac_terminal_set_color_scheme(ssh_client->term, settings->color_scheme);
+    guac_terminal_set_backspace(ssh_client->term, settings->backspace);
 
     /* Send current values of exposed arguments to owner only */
     guac_client_for_owner(client, guac_ssh_send_current_argv, ssh_client);
@@ -261,6 +259,17 @@ void* ssh_client_thread(void* data) {
                 settings->typescript_path,
                 settings->typescript_name,
                 settings->create_typescript_path);
+    }
+
+    /* Initalize and start the terminal */
+    int terminal_init_response = guac_terminal_start(ssh_client->term);
+
+    /* Fail if terminal init failed */
+    if (terminal_init_response != 0) {
+
+        guac_client_abort(client, GUAC_PROTOCOL_STATUS_SERVER_ERROR,
+                "Terminal initialization failed");
+        return NULL;
     }
 
     /* Get user and credentials */
@@ -400,7 +409,6 @@ void* ssh_client_thread(void* data) {
 
     /* Logged in */
     guac_client_log(client, GUAC_LOG_INFO, "SSH connection successful.");
-    guac_terminal_start(ssh_client->term);
 
     /* Start input thread */
     if (pthread_create(&(input_thread), NULL, ssh_input_thread, (void*) client)) {

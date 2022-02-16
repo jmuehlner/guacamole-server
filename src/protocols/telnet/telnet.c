@@ -586,18 +586,16 @@ void* guac_telnet_client_thread(void* data) {
     }
 
     /* Create terminal */
-    telnet_client->term = guac_terminal_create(client,
-            telnet_client->clipboard, settings->disable_copy,
-            settings->max_scrollback, settings->font_name, settings->font_size,
-            settings->resolution, settings->width, settings->height,
-            settings->color_scheme, settings->backspace);
+    telnet_client->term = guac_terminal_create(client, telnet_client->clipboard,
+            settings->width, settings->height, settings->resolution);
 
-    /* Fail if terminal init failed */
-    if (telnet_client->term == NULL) {
-        guac_client_abort(client, GUAC_PROTOCOL_STATUS_SERVER_ERROR,
-                "Terminal initialization failed");
-        return NULL;
-    }
+    /* Override configurable parameters from settings */
+    guac_terminal_set_font_name(telnet_client->term, settings->font_name);
+    guac_terminal_set_font_size(telnet_client->term, settings->font_size);
+    guac_terminal_set_max_scrollback(telnet_client->term, settings->max_scrollback);
+    guac_terminal_set_disable_copy(telnet_client->term, settings->disable_copy);
+    guac_terminal_set_color_scheme(telnet_client->term, settings->color_scheme);
+    guac_terminal_set_backspace(telnet_client->term, settings->backspace);
 
     /* Send current values of exposed arguments to owner only */
     guac_client_for_owner(client, guac_telnet_send_current_argv,
@@ -624,8 +622,18 @@ void* guac_telnet_client_thread(void* data) {
     /* Allow terminal to render if login success/failure detection is not
      * enabled */
     if (settings->login_success_regex == NULL
-            && settings->login_failure_regex == NULL)
-        guac_terminal_start(telnet_client->term);
+            && settings->login_failure_regex == NULL) {
+
+        /* Initalize and start the terminal */
+        int terminal_init_response = guac_terminal_start(telnet_client->term);
+
+        /* Fail if terminal init failed */
+        if (terminal_init_response != 0) {
+            guac_client_abort(client, GUAC_PROTOCOL_STATUS_SERVER_ERROR,
+                    "Terminal initialization failed");
+            return NULL;
+        }
+    }
 
     /* Start input thread */
     if (pthread_create(&(input_thread), NULL, __guac_telnet_input_thread, (void*) client)) {
