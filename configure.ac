@@ -636,11 +636,11 @@ fi
 
 
 #
-# FreeRDP 2 (libfreerdp2, libfreerdp-client2, and libwinpr2)
+# FreeRDP 2 (libfreerdp3, libfreerdp-client3, and libwinpr3)
 #
 
-have_freerdp2=disabled
-FREERDP2_PLUGIN_DIR=
+have_freerdp3=disabled
+freerdp3_PLUGIN_DIR=
 
 AC_ARG_WITH([rdp],
             [AS_HELP_STRING([--with-rdp],
@@ -652,7 +652,7 @@ AC_ARG_WITH([rdp],
 AC_ARG_WITH(freerdp_plugin_dir,
             [AS_HELP_STRING([--with-freerdp-plugin-dir=<path>],
                             [install FreeRDP plugins to the given directory @<:@default=check@:>@])
-            ],FREERDP2_PLUGIN_DIR=$withval)
+            ],freerdp3_PLUGIN_DIR=$withval)
 
 # Preserve CPPFLAGS so it can be restored later, following the addition of
 # options specific to FreeRDP tests
@@ -660,21 +660,21 @@ OLDCPPFLAGS="$CPPFLAGS"
 
 if test "x$with_rdp" != "xno"
 then
-    have_freerdp2=yes
-    PKG_CHECK_MODULES([RDP], [freerdp2 freerdp-client2 winpr2],
+    have_freerdp3=yes
+    PKG_CHECK_MODULES([RDP], [freerdp3 freerdp-client3 winpr3],
                       [CPPFLAGS="${RDP_CFLAGS} -Werror $CPPFLAGS"]
-                      [AS_IF([test "x${FREERDP2_PLUGIN_DIR}" = "x"],
-                             [FREERDP2_PLUGIN_DIR="`$PKG_CONFIG --variable=libdir freerdp2`/freerdp2"])],
+                      [AS_IF([test "x${freerdp3_PLUGIN_DIR}" = "x"],
+                             [freerdp3_PLUGIN_DIR="`$PKG_CONFIG --variable=libdir freerdp3`/freerdp3"])],
                       [AC_MSG_WARN([
   --------------------------------------------
-   Unable to find FreeRDP (libfreerdp2 / libfreerdp-client2 / libwinpr2)
+   Unable to find FreeRDP (libfreerdp3 / libfreerdp-client3 / libwinpr3)
    RDP will be disabled.
   --------------------------------------------])
-                       have_freerdp2=no])
+                       have_freerdp3=no])
 fi
 
 # Available color conversion functions
-if test "x$have_freerdp2" = "xyes"
+if test "x$have_freerdp3" = "xyes"
 then
 
     # FreeRDP 2.0.0-rc3 and older referred to FreeRDPConvertColor() as
@@ -696,7 +696,7 @@ AC_ARG_ENABLE(allow_freerdp_snapshots,
                               [allow building against unknown development snapshots of FreeRDP])
               ],allow_freerdp_snapshots=yes)
 
-if test "x${have_freerdp2}" = "xyes" -a "x${allow_freerdp_snapshots}" != "xyes"
+if test "x${have_freerdp3}" = "xyes" -a "x${allow_freerdp_snapshots}" != "xyes"
 then
 
     AC_MSG_CHECKING([whether FreeRDP appears to be a development version])
@@ -724,7 +724,7 @@ then
 fi
 
 # Variation in memory internal allocation/free behavior for bitmaps
-if test "x${have_freerdp2}" = "xyes"
+if test "x${have_freerdp3}" = "xyes"
 then
 
     # FreeRDP 2.0.0-rc0 and older automatically free rdpBitmap and its
@@ -748,7 +748,7 @@ then
 fi
 
 # Variation in memory internal allocation/free behavior for channel streams
-if test "x${have_freerdp2}" = "xyes"
+if test "x${have_freerdp3}" = "xyes"
 then
 
     # FreeRDP 2.0.0-rc3 through 2.0.0-rc4 automatically free the wStream
@@ -771,7 +771,7 @@ fi
 
 
 # Glyph callback variants
-if test "x${have_freerdp2}" = "xyes"
+if test "x${have_freerdp3}" = "xyes"
 then
 
     # FreeRDP 2.0.0-rc3 and older used UINT32 for integer parameters to all
@@ -804,7 +804,7 @@ then
 fi
 
 # CLIPRDR callback variants
-if test "x${have_freerdp2}" = "xyes"
+if test "x${have_freerdp3}" = "xyes"
 then
 
     # FreeRDP 2.0.0-rc3 and older did not use const for CLIPRDR callbacks
@@ -834,7 +834,7 @@ then
 fi
 
 # RAIL callback variants
-if test "x${have_freerdp2}" = "xyes"
+if test "x${have_freerdp3}" = "xyes"
 then
 
     # FreeRDP 2.0.0-rc3 and older did not use const for RAIL callbacks
@@ -864,7 +864,7 @@ then
 fi
 
 # Support for receiving unannounced orders from the RDP server
-if test "x${have_freerdp2}" = "xyes"
+if test "x${have_freerdp3}" = "xyes"
 then
     AC_CHECK_MEMBERS([rdpSettings.AllowUnanouncedOrdersFromServer],,
                      [AC_MSG_WARN([
@@ -880,7 +880,7 @@ fi
 
 # Updated certificate verification callback (introduced with 2.0.0, not present
 # in 2.0.0-rc4 or earlier)
-if test "x${have_freerdp2}" = "xyes"
+if test "x${have_freerdp3}" = "xyes"
 then
     AC_CHECK_MEMBERS([freerdp.VerifyCertificateEx],,,
                      [[#include <freerdp/freerdp.h>]])
@@ -889,8 +889,8 @@ fi
 # Restore CPPFLAGS, removing FreeRDP-specific options needed for testing
 CPPFLAGS="$OLDCPPFLAGS"
 
-AC_SUBST(FREERDP2_PLUGIN_DIR)
-AM_CONDITIONAL([ENABLE_RDP], [test "x${have_freerdp2}" = "xyes"])
+AC_SUBST(freerdp3_PLUGIN_DIR)
+AM_CONDITIONAL([ENABLE_RDP], [test "x${have_freerdp3}" = "xyes"])
 
 #
 # libssh2
@@ -1227,7 +1227,7 @@ AM_COND_IF([ENABLE_SYSTEMD], [build_systemd="${systemd_dir}"], [build_systemd=no
 # FreeRDP plugins
 #
 
-AM_COND_IF([ENABLE_RDP], [build_rdp_plugins="${FREERDP2_PLUGIN_DIR}"], [build_rdp_plugins=no])
+AM_COND_IF([ENABLE_RDP], [build_rdp_plugins="${freerdp3_PLUGIN_DIR}"], [build_rdp_plugins=no])
 
 #
 # Display summary
@@ -1240,7 +1240,7 @@ $PACKAGE_NAME version $PACKAGE_VERSION
 
    Library status:
 
-     freerdp2 ............ ${have_freerdp2}
+     freerdp3 ............ ${have_freerdp3}
      pango ............... ${have_pango}
      libavcodec .......... ${have_libavcodec}
      libavformat.......... ${have_libavformat}
