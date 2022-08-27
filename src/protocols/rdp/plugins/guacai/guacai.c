@@ -282,7 +282,7 @@ static UINT guac_rdp_ai_terminated(IWTSPlugin* plugin) {
 UINT DVCPluginEntry(IDRDYNVC_ENTRY_POINTS* pEntryPoints) {
 
     /* Pull guac_client from arguments */
-    ADDIN_ARGV* args = pEntryPoints->GetPluginData(pEntryPoints);
+    const ADDIN_ARGV* args = pEntryPoints->GetPluginData(pEntryPoints);
     guac_client* client = (guac_client*) guac_rdp_string_to_ptr(args->argv[1]);
 
     /* Pull previously-allocated plugin */

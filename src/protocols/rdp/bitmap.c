@@ -133,7 +133,7 @@ void guac_rdp_bitmap_free(rdpContext* context, rdpBitmap* bitmap) {
      * for the rdpBitmap will NOT be automatically released after this free
      * handler is invoked, thus we must do so manually here */
 
-    _aligned_free(bitmap->data);
+    winpr_aligned_free(bitmap->data);
     free(bitmap);
 #endif
 
