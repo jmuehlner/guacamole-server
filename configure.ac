@@ -640,7 +640,7 @@ fi
 #
 
 have_freerdp3=disabled
-freerdp3_PLUGIN_DIR=
+FREERDP3_PLUGIN_DIR=
 
 AC_ARG_WITH([rdp],
             [AS_HELP_STRING([--with-rdp],
@@ -652,7 +652,7 @@ AC_ARG_WITH([rdp],
 AC_ARG_WITH(freerdp_plugin_dir,
             [AS_HELP_STRING([--with-freerdp-plugin-dir=<path>],
                             [install FreeRDP plugins to the given directory @<:@default=check@:>@])
-            ],freerdp3_PLUGIN_DIR=$withval)
+            ],FREERDP3_PLUGIN_DIR=$withval)
 
 # Preserve CPPFLAGS so it can be restored later, following the addition of
 # options specific to FreeRDP tests
@@ -663,8 +663,8 @@ then
     have_freerdp3=yes
     PKG_CHECK_MODULES([RDP], [freerdp3 freerdp-client3 winpr3],
                       [CPPFLAGS="${RDP_CFLAGS} -Werror $CPPFLAGS"]
-                      [AS_IF([test "x${freerdp3_PLUGIN_DIR}" = "x"],
-                             [freerdp3_PLUGIN_DIR="`$PKG_CONFIG --variable=libdir freerdp3`/freerdp3"])],
+                      [AS_IF([test "x${FREERDP3_PLUGIN_DIR}" = "x"],
+                             [FREERDP3_PLUGIN_DIR="`$PKG_CONFIG --variable=libdir freerdp3`/freerdp3"])],
                       [AC_MSG_WARN([
   --------------------------------------------
    Unable to find FreeRDP (libfreerdp3 / libfreerdp-client3 / libwinpr3)
@@ -889,7 +889,7 @@ fi
 # Restore CPPFLAGS, removing FreeRDP-specific options needed for testing
 CPPFLAGS="$OLDCPPFLAGS"
 
-AC_SUBST(freerdp3_PLUGIN_DIR)
+AC_SUBST(FREERDP3_PLUGIN_DIR)
 AM_CONDITIONAL([ENABLE_RDP], [test "x${have_freerdp3}" = "xyes"])
 
 #
@@ -1227,7 +1227,7 @@ AM_COND_IF([ENABLE_SYSTEMD], [build_systemd="${systemd_dir}"], [build_systemd=no
 # FreeRDP plugins
 #
 
-AM_COND_IF([ENABLE_RDP], [build_rdp_plugins="${freerdp3_PLUGIN_DIR}"], [build_rdp_plugins=no])
+AM_COND_IF([ENABLE_RDP], [build_rdp_plugins="${FREERDP3_PLUGIN_DIR}"], [build_rdp_plugins=no])
 
 #
 # Display summary

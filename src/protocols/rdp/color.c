@@ -56,7 +56,7 @@ UINT32 guac_rdp_convert_color(rdpContext* context, UINT32 color) {
 
     /* Convert provided color into the intermediate representation expected by
      * FreeRDPConvertColor() */
-    UINT32 intermed = ReadColor((BYTE*) &color, src_format);
+    UINT32 intermed = FreeRDPReadColor((BYTE*) &color, src_format);
 
     /* Convert color from RDP source format to the native format used by Cairo,
      * still maintaining intermediate representation */
@@ -69,7 +69,7 @@ UINT32 guac_rdp_convert_color(rdpContext* context, UINT32 color) {
 
     /* Convert color from intermediate representation to the actual desired
      * format */
-    WriteColor((BYTE*) &color, dst_format, intermed);
+    FreeRDPWriteColor((BYTE*) &color, dst_format, intermed);
     return color;
 
 }
