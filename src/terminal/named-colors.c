@@ -758,7 +758,7 @@ static int guac_terminal_named_color_search(const void* a, const void* b) {
     for (; *key && *name; key++, name++) {
 
         /* Skip any spaces in key (name will never have spaces) */
-        while (*key && isspace(*key)) key++;
+        while (*key && isspace((unsigned char) *key)) key++;
 
         /* Treat semi-colon as string terminator, to support parsing color
            names within a larger string (e.g. within the terminal color-scheme

@@ -141,6 +141,7 @@ libguac_client_rdp_la_CFLAGS = \
     @RDP_CFLAGS@
 
 libguac_client_rdp_la_LDFLAGS = \
+    -no-undefined \
     -version-info 0:0:0         \
     @CAIRO_LIBS@                \
     @PTHREAD_LIBS@              \
@@ -173,6 +174,7 @@ libguac_common_svc_client_la_CFLAGS = \
     @RDP_CFLAGS@
 
 libguac_common_svc_client_la_LDFLAGS = \
+    -no-undefined \
     -module -avoid-version -shared     \
     @RDP_LIBS@
 
@@ -197,6 +199,7 @@ libguacai_client_la_CFLAGS = \
     @RDP_CFLAGS@
 
 libguacai_client_la_LDFLAGS =      \
+    -no-undefined \
     -module -avoid-version -shared \
     @PTHREAD_LIBS@                 \
     @RDP_LIBS@

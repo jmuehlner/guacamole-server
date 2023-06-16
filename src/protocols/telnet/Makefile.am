@@ -59,6 +59,7 @@ libguac_client_telnet_la_LIBADD = \
     @TERMINAL_LTLIB@
 
 libguac_client_telnet_la_LDFLAGS = \
+    -no-undefined \
     -version-info 0:0:0            \
     @PTHREAD_LIBS@                 \
     @TELNET_LIBS@

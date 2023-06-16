@@ -52,6 +52,7 @@ libguac_common_ssh_la_LIBADD = \
     @LIBGUAC_LTLIB@
 
 libguac_common_ssh_la_LDFLAGS = \
+    -no-undefined               \
     @PTHREAD_LIBS@              \
     @SSH_LIBS@                  \
     @SSL_LIBS@

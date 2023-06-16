@@ -62,10 +62,14 @@ static void guac_rdp_rdpgfx_channel_connected(rdpContext* context,
     RdpgfxClientContext* rdpgfx = (RdpgfxClientContext*) args->pInterface;
     rdpGdi* gdi = context->gdi;
 
+    // Return type is void under cygwin
+    gdi_graphics_pipeline_init(gdi, rdpgfx);
+    /*
     if (!gdi_graphics_pipeline_init(gdi, rdpgfx))
         guac_client_log(client, GUAC_LOG_WARNING, "Rendering backend for RDPGFX "
                 "channel could not be loaded. Graphics may not render at all!");
     else
+    */
         guac_client_log(client, GUAC_LOG_DEBUG, "RDPGFX channel will be used for "
                 "the RDP Graphics Pipeline Extension.");
 

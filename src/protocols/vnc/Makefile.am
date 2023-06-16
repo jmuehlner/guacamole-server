@@ -62,6 +62,7 @@ libguac_client_vnc_la_CFLAGS =        \
     @PULSE_INCLUDE@
 
 libguac_client_vnc_la_LDFLAGS = \
+    -no-undefined \
     -version-info 0:0:0         \
     @CAIRO_LIBS@                \
     @VNC_LIBS@ 

@@ -42,7 +42,7 @@ AC_CHECK_HEADERS([fcntl.h stdlib.h string.h sys/socket.h time.h sys/time.h syslo
 
 # Source characteristics
 AC_DEFINE([_XOPEN_SOURCE], [700], [Uses X/Open and POSIX APIs])
-AC_DEFINE([__BSD_VISIBLE], [1], [Uses BSD-specific APIs (if available)])
+# AC_DEFINE([__BSD_VISIBLE], [1], [Uses BSD-specific APIs (if available)])
 
 # Check for whether math library is required
 AC_CHECK_LIB([m], [cos],
@@ -356,23 +356,6 @@ AC_SUBST(SSL_LIBS)
 #
 
 have_winsock=disabled
-WINSOCK_LIBS=
-AC_ARG_WITH([winsock],
-            [AS_HELP_STRING([--with-winsock],
-                            [support Windows Sockets API @<:@default=check@:>@])],
-            [],
-            [with_winsock=check])
-
-if test "x$with_winsock" != "xno"
-then
-    have_winsock=yes
-    AC_CHECK_LIB([wsock32], [main],
-                 [WINSOCK_LIBS="-lwsock32"]
-                 [AC_DEFINE([ENABLE_WINSOCK],,
-                            [Whether Windows Socket API support is enabled])],
-                 [have_winsock=no])
-fi
-
 AM_CONDITIONAL([ENABLE_WINSOCK], [test "x${have_winsock}" = "xyes"])
 AC_SUBST(WINSOCK_LIBS)
 

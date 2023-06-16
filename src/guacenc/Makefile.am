@@ -99,6 +99,7 @@ guacenc_LDADD =     \
     @LIBGUAC_LTLIB@
 
 guacenc_LDFLAGS =   \
+    -no-undefined   \
     @AVCODEC_LIBS@  \
     @AVFORMAT_LIBS@ \
     @AVUTIL_LIBS@   \

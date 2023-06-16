@@ -29,12 +29,12 @@
 /**
  * String prefix which begins the library filename of all client plugins.
  */
-#define GUAC_PROTOCOL_LIBRARY_PREFIX "libguac-client-"
+#define GUAC_PROTOCOL_LIBRARY_PREFIX "cygguac-client-"
 
 /**
  * String suffix which ends the library filename of all client plugins.
  */
-#define GUAC_PROTOCOL_LIBRARY_SUFFIX ".so"
+#define GUAC_PROTOCOL_LIBRARY_SUFFIX "-0.dll"
 
 /**
  * The maximum number of characters (COUNTING NULL TERMINATOR) to allow

@@ -72,13 +72,21 @@ static int guac_terminal_color_scheme_compare_token(const char* str_start,
 static void guac_terminal_color_scheme_strip_spaces(const char** str_start,
         const char** str_end) {
 
+    /*
+        color-scheme.c:76:45: error: array subscript has type 'char' [-Werror=char-subscripts]
+        76 |     while (*str_start < *str_end && isspace(**str_start))
+           |                                             ^~~~~~~~~~~
+    */
+    const unsigned char** unsigned_str_start = (const unsigned char**) str_start;
+    const unsigned char** unsigned_str_end = (const unsigned char**) str_end;
+
     /* Strip leading spaces. */
-    while (*str_start < *str_end && isspace(**str_start))
-        (*str_start)++;
+    while (*unsigned_str_start < *unsigned_str_end && isspace(**unsigned_str_start))
+        (*unsigned_str_start)++;
 
     /* Strip trailing spaces. */
-    while (*str_end > *str_start && isspace(*(*str_end - 1)))
-        (*str_end)--;
+    while (*unsigned_str_end > *unsigned_str_start && isspace(*(*unsigned_str_end - 1)))
+        (*unsigned_str_end)--;
 }
 
 /**

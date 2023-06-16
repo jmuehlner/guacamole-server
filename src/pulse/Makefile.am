@@ -42,5 +42,6 @@ libguac_pulse_la_LIBADD = \
     @LIBGUAC_LTLIB@
 
 libguac_pulse_la_LDFLAGS = \
+    -no-undefined \
     @PULSE_LIBS@
 

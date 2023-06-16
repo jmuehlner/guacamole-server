@@ -20,9 +20,6 @@
 #include "config.h"
 #include "move-fd.h"
 
-/* Required for CMSG_* macros on BSD */
-#define __BSD_VISIBLE 1
-
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
