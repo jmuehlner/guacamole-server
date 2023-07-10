@@ -496,7 +496,7 @@ then
 
     # Whether libvncserver was built against libgcrypt
     AC_CHECK_DECL([LIBVNCSERVER_WITH_CLIENT_GCRYPT],
-                         [AC_CHECK_HEADER(gcrypt.h,,
+                         [AC_CHECK_HEADER(gcrypt.h, [VNC_LIBS="$VNC_LIBS -lgcrypt"],
                                           [AC_MSG_WARN([
   --------------------------------------------
    libvncserver appears to be built against
@@ -923,7 +923,7 @@ then
     # Whether libssh2 was built against libgcrypt
     AC_CHECK_LIB([ssh2], [gcry_control],
                          [AC_CHECK_HEADER(gcrypt.h,
-                                          [AC_DEFINE([LIBSSH2_USES_GCRYPT],,
+                                          [AC_DEFINE([LIBSSH2_USES_GCRYPT],[SSH_LIBS="$SSH_LIBS -lgcrypt"],
                                                      [Whether libssh2 was built against libgcrypt])],
                                           [AC_MSG_WARN([
   --------------------------------------------
