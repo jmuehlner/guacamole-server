@@ -18,6 +18,7 @@
  */
 
 #include "config.h"
+#include "log.h"
 #include "move-fd.h"
 
 #include <errno.h>
@@ -28,10 +29,67 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-int guacd_send_fd(int sock, int fd) {
+#include <guacamole/client-types.h>
 
+/* Windows headers */
+#include <errhandlingapi.h>
+#include <fcntl.h>
+#include <handleapi.h>
+#include <io.h>
+#include <processthreadsapi.h>
+
+int guacd_send_fd(int pid, int sock, int fd) {
+
+    /* Create handle from file descriptor */
+    HANDLE fd_handle = (HANDLE) _get_osfhandle(fd);
+    if (fd_handle == NULL) {
+        guacd_log(GUAC_LOG_ERROR, 
+                "Unable to allocate handle for file descriptor: %d", 
+                GetLastError());
+        return 0;
+    }
+
+    /* Handle duplicated into the target process */
+    HANDLE target_handle;
+
+    /* Create handle for the target process */
+    HANDLE process_handle = OpenProcess(PROCESS_DUP_HANDLE, 0, pid);
+    if (process_handle == NULL) {
+        guacd_log(GUAC_LOG_ERROR, 
+                "Unable to allocate handle for process ID: %d", 
+                GetLastError());
+        CloseHandle(fd_handle);
+        return 0;
+    }
+
+    /* Duplicate the file description into the target process */
+    BOOL handle_created = DuplicateHandle(
+            GetCurrentProcess(), 
+            fd_handle, 
+            process_handle,
+            &target_handle, 
+            0,
+            FALSE,
+            DUPLICATE_SAME_ACCESS);
+
+    if (!handle_created) {
+        guacd_log(GUAC_LOG_ERROR, 
+                "Unable to duplicate handle: %d", GetLastError());
+        CloseHandle(fd_handle);
+        CloseHandle(process_handle);
+        CloseHandle(target_handle);
+        return 0;
+    }
+
+    /* 
+     * Split the handle into bytes to send across the handle 
+     * NOTE: This does NOT convert to network byte order, and instead relies
+     * on the target process, running on the same system, using the same byte
+     * order. This should be fine...
+     */
     struct msghdr message = {0};
-    char message_data[] = {'G'};
+    char message_data[sizeof(target_handle)];
+    memcpy(&message_data, &target_handle, sizeof(target_handle));
 
     /* Assign data buffer */
     struct iovec io_vector[1];
@@ -39,20 +97,6 @@ int guacd_send_fd(int sock, int fd) {
     io_vector[0].iov_len  = sizeof(message_data);
     message.msg_iov    = io_vector;
     message.msg_iovlen = 1;
-
-    /* Assign ancillary data buffer */
-    char buffer[CMSG_SPACE(sizeof(fd))] = {0};
-    message.msg_control = buffer;
-    message.msg_controllen = sizeof(buffer);
-
-    /* Set fields of control message header */
-    struct cmsghdr* control = CMSG_FIRSTHDR(&message);
-    control->cmsg_level = SOL_SOCKET;
-    control->cmsg_type  = SCM_RIGHTS;
-    control->cmsg_len   = CMSG_LEN(sizeof(fd));
-
-    /* Add file descriptor to message data */
-    memcpy(CMSG_DATA(control), &fd, sizeof(fd));
 
     /* Send file descriptor */
     return (sendmsg(sock, &message, 0) == sizeof(message_data));
@@ -61,10 +105,10 @@ int guacd_send_fd(int sock, int fd) {
 
 int guacd_recv_fd(int sock) {
 
-    int fd;
+    HANDLE fd_handle;
 
     struct msghdr message = {0};
-    char message_data[1];
+    char message_data[sizeof(HANDLE)];
 
     /* Assign data buffer */
     struct iovec io_vector[1];
@@ -73,32 +117,17 @@ int guacd_recv_fd(int sock) {
     message.msg_iov    = io_vector;
     message.msg_iovlen = 1;
 
-
-    /* Assign ancillary data buffer */
-    char buffer[CMSG_SPACE(sizeof(fd))];
-    message.msg_control = buffer;
-    message.msg_controllen = sizeof(buffer);
-
     /* Receive file descriptor */
     if (recvmsg(sock, &message, 0) == sizeof(message_data)) {
 
-        /* Validate payload */
-        if (message_data[0] != 'G') {
-            errno = EPROTO;
-            return -1;
-        }
+        /* 
+         * Copy the data from the message to get the handle, which was
+         * previously copied into this process using DuplicateHandle()
+         */
+        memcpy(&fd_handle, &message, sizeof(HANDLE));
 
-        /* Iterate control headers, looking for the sent file descriptor */
-        struct cmsghdr* control;
-        for (control = CMSG_FIRSTHDR(&message); control != NULL; control = CMSG_NXTHDR(&message, control)) {
-
-            /* Pull file descriptor from data */
-            if (control->cmsg_level == SOL_SOCKET && control->cmsg_type == SCM_RIGHTS) {
-                memcpy(&fd, CMSG_DATA(control), sizeof(fd));
-                return fd;
-            }
-
-        }
+        /* Convert from a windows handle to a unix-style file descriptor */
+        return _open_osfhandle(fd_handle, _O_TEXT);
 
     } /* end if recvmsg() success */
 

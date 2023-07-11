@@ -335,7 +335,7 @@ static void guacd_exec_proc(guacd_proc* proc, const char* protocol) {
 
     /* Add each received file descriptor as a new user */
     int received_fd;
-    while ((received_fd = guacd_recv_fd(proc->fd_socket)) != -1) {
+    while ((received_fd = guacd_recv_fd()) != -1) {
 
         guacd_proc_add_user(proc, received_fd, owner);
 
@@ -389,23 +389,10 @@ cleanup_process:
 }
 
 guacd_proc* guacd_create_proc(const char* protocol) {
-
-    int sockets[2];
-
-    /* Open UNIX socket pair */
-    if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sockets) < 0) {
-        guacd_log(GUAC_LOG_ERROR, "Error opening socket pair: %s", strerror(errno));
-        return NULL;
-    }
-
-    int parent_socket = sockets[0];
-    int child_socket = sockets[1];
-
+    
     /* Allocate process */
     guacd_proc* proc = calloc(1, sizeof(guacd_proc));
     if (proc == NULL) {
-        close(parent_socket);
-        close(child_socket);
         return NULL;
     }
 
@@ -413,8 +400,6 @@ guacd_proc* guacd_create_proc(const char* protocol) {
     proc->client = guac_client_alloc();
     if (proc->client == NULL) {
         guacd_log_guac_error(GUAC_LOG_ERROR, "Unable to create client");
-        close(parent_socket);
-        close(child_socket);
         free(proc);
         return NULL;
     }
@@ -426,8 +411,6 @@ guacd_proc* guacd_create_proc(const char* protocol) {
     proc->pid = fork();
     if (proc->pid < 0) {
         guacd_log(GUAC_LOG_ERROR, "Cannot fork child process: %s", strerror(errno));
-        close(parent_socket);
-        close(child_socket);
         guac_client_free(proc->client);
         free(proc);
         return NULL;
@@ -436,21 +419,8 @@ guacd_proc* guacd_create_proc(const char* protocol) {
     /* Child */
     else if (proc->pid == 0) {
 
-        /* Communicate with parent */
-        proc->fd_socket = parent_socket;
-        close(child_socket);
-
         /* Start protocol-specific handling */
         guacd_exec_proc(proc, protocol);
-
-    }
-
-    /* Parent */
-    else {
-
-        /* Communicate with child */
-        proc->fd_socket = child_socket;
-        close(parent_socket);
 
     }
 

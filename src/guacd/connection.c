@@ -193,7 +193,7 @@ static int guacd_add_user(guacd_proc* proc, guac_parser* parser, guac_socket* so
     int proc_fd = sockets[1];
 
     /* Send user file descriptor to process */
-    if (!guacd_send_fd(proc->fd_socket, proc_fd)) {
+    if (!guacd_send_fd(proc->fd_socket, proc->pid, proc_fd)) {
         guacd_log(GUAC_LOG_ERROR, "Unable to add user.");
         return 1;
     }
