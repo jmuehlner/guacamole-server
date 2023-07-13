@@ -32,17 +32,13 @@
  *     The file descriptor of an open UNIX domain socket along which the file
  *     descriptor specified by fd should be sent.
  *
- * @param pid
- *     The ID of the process to the file descriptor specified by fd should
- *     be sent.
- *
  * @param fd
  *     The file descriptor to send along the given UNIX domain socket.
  *
  * @return
  *     Non-zero if the send operation succeeded, zero on error.
  */
-int guacd_send_fd(int pid, int sock, int fd);
+int guacd_send_fd(int sock, int fd);
 
 /**
  * Waits for a file descriptor on the given socket, returning the received file

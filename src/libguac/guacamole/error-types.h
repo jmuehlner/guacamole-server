@@ -59,6 +59,12 @@ typedef enum guac_status {
     GUAC_STATUS_SEE_ERRNO,
 
     /**
+     * An error occurred, and further information about the error can be
+     * retrieved using the GetLastError function.
+     */
+    GUAC_STATUS_SEE_LAST_ERROR,
+
+    /**
      * An I/O error prevented the operation from succeeding.
      */
     GUAC_STATUS_IO_ERROR,

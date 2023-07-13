@@ -22,6 +22,7 @@
 #include "connection.h"
 #include "log.h"
 #include "move-fd.h"
+#include "move-handle.h"
 #include "proc.h"
 #include "proc-map.h"
 
@@ -44,6 +45,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
+
+/* Windows */
+#include <io.h>
 
 /**
  * Behaves exactly as write(), but writes as much as possible, returning
@@ -181,9 +185,11 @@ void* guacd_connection_io_thread(void* data) {
  */
 static int guacd_add_user(guacd_proc* proc, guac_parser* parser, guac_socket* socket) {
 
-    int sockets[2];
+    int pipes[2];
 
-    /* Set up socket pair */
+    pipe()
+
+    /* Set up pipe */
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) < 0) {
         guacd_log(GUAC_LOG_ERROR, "Unable to allocate file descriptors for I/O transfer: %s", strerror(errno));
         return 1;
@@ -193,7 +199,7 @@ static int guacd_add_user(guacd_proc* proc, guac_parser* parser, guac_socket* so
     int proc_fd = sockets[1];
 
     /* Send user file descriptor to process */
-    if (!guacd_send_fd(proc->fd_socket, proc->pid, proc_fd)) {
+    if (!guacd_send_handle(proc->pid, proc->fd_socket, (HANDLE) _get_osfhandle(user_fd))) {
         guacd_log(GUAC_LOG_ERROR, "Unable to add user.");
         return 1;
     }

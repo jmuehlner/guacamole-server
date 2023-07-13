@@ -38,19 +38,21 @@ noinst_HEADERS =  \
     conf-parse.h  \
     connection.h  \
     log.h         \
+    move-handle.h \
     move-fd.h     \
     proc.h        \
     proc-map.h
 
-guacd_SOURCES =  \
-    conf-args.c  \
-    conf-file.c  \
-    conf-parse.c \
-    connection.c \
-    daemon.c     \
-    log.c        \
-    move-fd.c    \
-    proc.c       \
+guacd_SOURCES =   \
+    conf-args.c   \
+    conf-file.c   \
+    conf-parse.c  \
+    connection.c  \
+    daemon.c      \
+    log.c         \
+    move-handle.c \
+    move-fd.c     \
+    proc.c        \
     proc-map.c
 
 guacd_CFLAGS =              \

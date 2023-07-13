@@ -27,6 +27,8 @@
 
 #include <unistd.h>
 
+#include <handleapi.h>
+
 /**
  * The number of milliseconds to wait for messages in any phase before
  * timing out and closing the connection with an error.
@@ -66,6 +68,13 @@ typedef struct guacd_proc {
      * versa.
      */
     int fd_socket;
+
+    /**
+     * The file handle to use for sending and receiving file handles of new users. 
+     * This parent will see this as the file descriptor for communicating with the
+     * child and vice versa.
+     */
+    int handle_socket;
 
     /**
      * The actual client instance. This will be visible to both child and
