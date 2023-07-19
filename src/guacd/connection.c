@@ -32,6 +32,7 @@
 #include <guacamole/plugin.h>
 #include <guacamole/protocol.h>
 #include <guacamole/socket.h>
+#include <guacamole/socket-handle.h>
 #include <guacamole/user.h>
 
 #ifdef ENABLE_SSL
@@ -185,32 +186,54 @@ void* guacd_connection_io_thread(void* data) {
  */
 static int guacd_add_user(guacd_proc* proc, guac_parser* parser, guac_socket* socket) {
 
-    int pipes[2];
-
-    pipe()
-
-    /* Set up pipe */
-    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) < 0) {
-        guacd_log(GUAC_LOG_ERROR, "Unable to allocate file descriptors for I/O transfer: %s", strerror(errno));
+    /* Set up a pipe for transferring data from guacd to the user */
+    int to_user[2];
+    if (pipe(to_user) != 0) {
+        guacd_log(GUAC_LOG_ERROR, "Unable to create pipe for writing to user.");
         return 1;
     }
 
-    int user_fd = sockets[0];
-    int proc_fd = sockets[1];
+    /* Set up a pipe for transferring data from the user to guacd */
+    int to_guacd[2];
+    if (pipe(to_guacd) != 0) {
+        close(to_user[0]);
+        close(to_user[1]);
+        guacd_log(GUAC_LOG_ERROR, "Unable to create pipe for reading from user.");
+        return 1;
+    }
 
-    /* Send user file descriptor to process */
-    if (!guacd_send_handle(proc->pid, proc->fd_socket, (HANDLE) _get_osfhandle(user_fd))) {
+    HANDLE guacd_to_user = (HANDLE) _get_osfhandle(to_user[1]);
+    HANDLE user_from_guacd = (HANDLE) _get_osfhandle(to_user[0]);
+
+    HANDLE user_to_guacd = (HANDLE) _get_osfhandle(to_guacd[1]);
+    HANDLE guacd_from_user = (HANDLE) _get_osfhandle(to_guacd[0]);
+
+    fprintf(stderr, "guacd_to_user:   %p\n", guacd_to_user);
+    fprintf(stderr, "user_from_guacd: %p\n", user_from_guacd);
+    fprintf(stderr, "user_to_guacd:   %p\n", user_to_guacd);
+    fprintf(stderr, "guacd_from_user: %p\n", guacd_from_user);
+
+    /* Send user file handles to process */
+    if (!guacd_send_handles(proc->pid, proc->fd_socket, 
+            user_to_guacd, user_from_guacd)) {
+
+        CloseHandle(guacd_to_user);
+        CloseHandle(user_from_guacd);
+        CloseHandle(user_to_guacd);
+        CloseHandle(guacd_from_user);
         guacd_log(GUAC_LOG_ERROR, "Unable to add user.");
         return 1;
-    }
 
-    /* Close our end of the process file descriptor */
-    close(proc_fd);
+    }
 
     guacd_connection_io_thread_params* params = malloc(sizeof(guacd_connection_io_thread_params));
     params->parser = parser;
     params->socket = socket;
-    params->fd = user_fd;
+
+    params->write_handle = guacd_to_user;
+    params->read_handle = guacd_from_user;
+
+    // TOOD: close the unused end of the pipes once it's clear that's ok with windows
 
     /* Start I/O thread */
     pthread_t io_thread;
@@ -395,7 +418,7 @@ void* guacd_connection_thread(void* data) {
 
 #else
     /* Open guac_socket */
-    socket = guac_socket_open(connected_socket_fd);
+    socket = guac_socket_open_handle(connected_socket_fd);
 #endif
 
     /* Route connection according to Guacamole, creating a new process if needed */

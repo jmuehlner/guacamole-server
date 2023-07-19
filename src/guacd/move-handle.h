@@ -23,10 +23,10 @@
 #include <handleapi.h>
 
 /**
- * Sends the given file handle along the given socket, allowing the receiving
- * process to use that file descriptor normally. Returns non-zero on
- * success, zero on error, just as a normal call to sendmsg() would. If an
- * error does occur, errno will be set appropriately.
+ * Sends the given file handles along the given socket, allowing the receiving
+ * process to use the file handles normally. Returns non-zero on success, zero 
+ * on error, just as a normal call to sendmsg() would. If an error does occur, 
+ * GetLastError() will return the appropriate error.
  *
  * @param sock
  *     The file descriptor of an open UNIX domain socket along which the file
@@ -36,16 +36,19 @@
  *     The ID of the process to which the the file handle specified by handle 
  *     should be sent.
  *
- * @param handle
- *     The file handle to send along the given UNIX domain socket.
+ * @param write_handle
+ *     The write file handle to send along the given UNIX domain socket.
+ *
+ * @param read_handle
+ *     The read file handle to send along the given UNIX domain socket.
  *
  * @return
  *     Non-zero if the send operation succeeded, zero on error.
  */
-int guacd_send_handle(int pid, int sock, HANDLE handle);
+int guacd_send_handles(int pid, int sock, HANDLE write_handle, HANDLE read_handle);
 
 /**
- * Waits for a file handle on the given socket, returning the received file
+ * Waits for a file handle on the given socket, populating the received file
  * handle. The file handle must have been sent via guacd_send_handle. If an
  * error occurs, -1 is returned, and errno will be set appropriately.
  *
@@ -53,11 +56,13 @@ int guacd_send_handle(int pid, int sock, HANDLE handle);
  *     The file descriptor of an open UNIX domain socket along which the file
  *     handle will be sent (by guacd_send_handle()).
  *
+ * @param handles
+ *     An array of HANDLEs to be populated.
+ *
  * @return
- *     The received file handle, or NULL if an error occurs preventing
- *     receipt of the file descriptor.
+ *     Non-zero if the receive operation succeeded, zero on error
  */
-HANDLE guacd_recv_handle(int sock);
+int guacd_recv_handles(int sock, HANDLE* handles);
 
 #endif
 

@@ -62,12 +62,17 @@ typedef struct guacd_user_thread_params {
     /**
      * The file descriptor of the joining user's socket.
      */
-    int fd;
+    //int fd;
 
     /**
-     * The file handle of the joining user's socket.
+     * The file handle for writing to the joining user's socket.
      */
-    HANDLE handle;
+    HANDLE write_handle;
+
+    /**
+     * The file handle for reading from the joining user's socket.
+     */
+    HANDLE read_handle;
 
     /**
      * Whether the joining user is the connection owner.
@@ -95,7 +100,8 @@ static void* guacd_user_thread(void* data) {
     guac_client* client = proc->client;
 
     /* Get guac_socket for user's file descriptor */
-    guac_socket* socket = guac_socket_open_handle(params->handle);
+    guac_socket* socket = guac_socket_open_handle(
+            params->write_handle, params->read_handle);
     if (socket == NULL)
         return NULL;
 
@@ -131,19 +137,25 @@ static void* guacd_user_thread(void* data) {
  * @param proc
  *     The process that the user is being added to.
  *
- * @param handle
- *     The file handle associated with the user's network connection to
+ * @param write_handle
+ *     The write handle associated with the user's network connection to
+ *     guacd.
+ *
+ * @param read_handle
+ *     The read handle associated with the user's network connection to
  *     guacd.
  *
  * @param owner
  *     Non-zero if the user is the owner of the connection being joined (they
  *     are the first user to join), or zero otherwise.
  */
-static void guacd_proc_add_user(guacd_proc* proc, HANDLE handle, int owner) {
+static void guacd_proc_add_user(
+        guacd_proc* proc, HANDLE write_handle, HANDLE read_handle, int owner) {
 
     guacd_user_thread_params* params = malloc(sizeof(guacd_user_thread_params));
     params->proc = proc;
-    params->handle = handle;
+    params->write_handle = write_handle;
+    params->read_handle = read_handle;
     params->owner = owner;
 
     /* Start user thread */
@@ -344,11 +356,12 @@ static void guacd_exec_proc(guacd_proc* proc, const char* protocol) {
     /* Enable keep alive on the broadcast socket */
     guac_socket_require_keep_alive(client->socket);
 
-    /* Add each received file handle as a new user */
-    HANDLE received_handle;
-    while ((received_handle = guacd_recv_handle(proc->fd_socket)) != NULL) {
+    /* Add each received file handle pair as a new user */
+    HANDLE received_handles[2];
+    while (guacd_recv_handles(proc->fd_socket, received_handles)) {
 
-        guacd_proc_add_user(proc, received_handle, owner);
+        guacd_proc_add_user(
+                proc, received_handles[0], received_handles[1], owner);
 
         /* Future file descriptors are not owners */
         owner = 0;

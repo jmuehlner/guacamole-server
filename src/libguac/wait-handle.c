@@ -19,6 +19,9 @@
 
 #include "config.h"
 
+#include <stdio.h>
+
+#include <errhandlingapi.h>
 #include <windef.h>
 #include <handleapi.h>
 #include <winbase.h>
@@ -30,11 +33,6 @@ int guac_wait_for_handle(HANDLE handle, int usec_timeout) {
      * TODO: Should this be set just once?
      */
     SetCommMask(handle, EV_RXCHAR);
-
-    /* The originally configured timeouts for this handle */
-    COMMTIMEOUTS original_timeouts;
-    if (GetCommTimeouts(handle, &original_timeouts))
-        return -1;
 
     /* New timeout configuration, specific to this wait */
     COMMTIMEOUTS wait_timeouts;
@@ -48,9 +46,17 @@ int guac_wait_for_handle(HANDLE handle, int usec_timeout) {
     wait_timeouts.WriteTotalTimeoutConstant = 0;
     wait_timeouts.WriteTotalTimeoutMultiplier = 0;
 
+    fprintf(stderr, "I will set the timeouts...\n");
+
     // Set the configured timeout
-    if (SetCommTimeouts(handle, &wait_timeouts))
+    BOOL success = SetCommTimeouts(handle, &wait_timeouts);
+        
+    fprintf(stderr, "The error was %i\n", GetLastError());
+
+    if (!success)
         return -1;
+
+    fprintf(stderr, "I have set the timeouts...\n");
 
     /* 
      * The type of event that occurred. This isn't actually used, since the
@@ -60,16 +66,15 @@ int guac_wait_for_handle(HANDLE handle, int usec_timeout) {
     DWORD event_mask;
 
     /* Wait for new data to be available */
-    BOOL success = WaitCommEvent(handle, &event_mask, NULL);
+    success = WaitCommEvent(handle, &event_mask, NULL);
 
-    /* Restore the original timeout config. TODO: Is this actually needed? */
-    SetCommTimeouts(handle, &original_timeouts);
+    fprintf(stderr, "I have waited for the comm event...\n");
         
     /* This MIGHT be the error that it returns if the wait times out... */
     if (!success && GetLastError() == WAIT_TIMEOUT)
         return 0;
 
-    /* Otherwise, return 1 for sucess and -1 for error */
+    /* Otherwise, return 1 for success and -1 for error */
     return success ? 1 : -1;
     
 }

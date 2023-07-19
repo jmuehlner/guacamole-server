@@ -35,17 +35,21 @@
 /**
  * Creates a new guac_socket which will use the Windows handle API for all
  * communication. Freeing this guac_socket will automatically close the 
- * associated handle.
+ * associated handles.
  *
- * @param handle
- *     The file handle to use for the connection underlying the created
- *     guac_socket.
+ * @param write_handle
+ *     The file handle to use for the writing to the connection underlying
+ *     the created guac_socket.
+ *
+ * @param read_handle
+ *     The file handle to use for the reading from the connection underlying
+ *     the created guac_socket.
  *
  * @return
  *     A newly-allocated guac_socket which will transparently use the Windows
  *     handle API for all communication.
  */
-guac_socket* guac_socket_open_handle(HANDLE handle);
+guac_socket* guac_socket_open_handle(HANDLE write_handle, HANDLE read_handle);
 
 #endif
 

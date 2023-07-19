@@ -33,6 +33,7 @@
 
 #include <handleapi.h>
 #include <fileapi.h>
+#include <errhandlingapi.h>
 
 /**
  * Data associated with an open socket which writes to a file handle.
@@ -40,9 +41,14 @@
 typedef struct guac_socket_handle_data {
 
     /**
-     * The associated file handle;
+     * The associated file write handle.
      */
-    HANDLE handle;
+    HANDLE write_handle;
+
+    /**
+     * The associated file write handle.
+     */
+    HANDLE read_handle;
 
     /**
      * The number of bytes currently in the main write buffer.
@@ -98,15 +104,17 @@ static ssize_t guac_socket_handle_write(guac_socket* socket,
     while (count > 0) {
 
         DWORD bytes_written;
-        BOOL failed = WriteFile(
-                data->handle, buf, count, &bytes_written, NULL);
+        BOOL success = WriteFile(
+                data->write_handle, buf, count, &bytes_written, NULL);
 
         /* Record errors in guac_error */
-        if (failed) {
+        if (!success) {
             guac_error = GUAC_STATUS_SEE_LAST_ERROR;
             guac_error_message = "Error writing data to socket";
             return -1;
         }
+
+        fprintf(stderr, "I wrote %u bytes to %p\n", bytes_written, data->write_handle);
 
         /* Advance buffer to next chunk */
         buffer += bytes_written;
@@ -140,14 +148,20 @@ static ssize_t guac_socket_handle_read_handler(guac_socket* socket,
     guac_socket_handle_data* data = (guac_socket_handle_data*) socket->data;
 
     DWORD bytes_read;
-    BOOL failed = ReadFile(
-            data->handle, buf, count, &bytes_read, NULL);
+    BOOL success = ReadFile(
+            data->read_handle, buf, count, &bytes_read, NULL);
+
+    fprintf(stderr, "Trying to read %lu bytes from handle %p\n", count, data->read_handle);
 
     /* Record errors in guac_error */
-    if (failed) {
+    if (!success) {
         guac_error = GUAC_STATUS_SEE_LAST_ERROR;
         guac_error_message = "Error reading data from socket";
+
+        fprintf(stderr, "The read error was %i\n", GetLastError());
     }
+
+    fprintf(stderr, "I read %u bytes from handle %p\n", bytes_read, data->read_handle);
 
     return bytes_read;
 
@@ -330,7 +344,11 @@ static int guac_socket_handle_select_handler(guac_socket* socket,
 
     /* Wait for data on socket */
     guac_socket_handle_data* data = (guac_socket_handle_data*) socket->data;
-    int retval = guac_wait_for_handle(data->handle, usec_timeout);
+
+    //fprintf(stderr, "About to wait for data on %p\n", data->read_handle);
+    int retval = guac_wait_for_handle(data->read_handle, usec_timeout);
+    //fprintf(stderr, "Got %i by waiting on %p\n", retval, data->read_handle);
+    //fprintf(stderr, "The error is %i\n", GetLastError());
 
     /* Properly set guac_error */
     if (retval <  0) {
@@ -366,8 +384,9 @@ static int guac_socket_handle_free_handler(guac_socket* socket) {
     pthread_mutex_destroy(&(data->socket_lock));
     pthread_mutex_destroy(&(data->buffer_lock));
 
-    /* Close file handle */
-    CloseHandle(data->handle);
+    /* Close file handles */
+    CloseHandle(data->write_handle);
+    CloseHandle(data->read_handle);
 
     free(data);
     return 0;
@@ -404,7 +423,7 @@ static void guac_socket_handle_unlock_handler(guac_socket* socket) {
 
 }
 
-guac_socket* guac_socket_open_handle(HANDLE handle) {
+guac_socket* guac_socket_open_handle(HANDLE write_handle, HANDLE read_handle) {
 
     pthread_mutexattr_t lock_attributes;
 
@@ -412,8 +431,9 @@ guac_socket* guac_socket_open_handle(HANDLE handle) {
     guac_socket* socket = guac_socket_alloc();
     guac_socket_handle_data* data = malloc(sizeof(guac_socket_handle_data));
 
-    /* Store file handle as socket data */
-    data->handle = handle;
+    /* Store file handles as socket data */
+    data->write_handle = write_handle;
+    data->read_handle = read_handle;
     data->written = 0;
     socket->data = data;
 

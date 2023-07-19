@@ -40,8 +40,17 @@
 #include <windows.h>
 #include <sys/cygwin.h>
 
-int guacd_send_handle(int pid, int sock, HANDLE handle) {
-
+/**
+ * Duplicate the provided handle into the process identified by the provided
+ * unix process ID. Returns the handle on success, or NULL on failure.
+ * 
+ * @param pid
+ *     The unix proccess ID of the process to duplicate the handle into.
+ * 
+ * @param 
+ */
+static HANDLE duplicate_handle(int pid, HANDLE handle) {
+    
     /* Handle to be duplicated into the target process */
     HANDLE target_handle;
 
@@ -58,7 +67,7 @@ int guacd_send_handle(int pid, int sock, HANDLE handle) {
         guacd_log(GUAC_LOG_ERROR, 
                 "Unable to allocate handle for process ID %d: %d", 
                 win_pid, GetLastError());
-        return 0;
+        return NULL;
     }
 
     /* Duplicate the file description into the target process */
@@ -72,23 +81,45 @@ int guacd_send_handle(int pid, int sock, HANDLE handle) {
             DUPLICATE_SAME_ACCESS);
         
     CloseHandle(process_handle);
-    CloseHandle(target_handle);
 
     if (!handle_created) {
         guacd_log(GUAC_LOG_ERROR, 
                 "Unable to duplicate handle: %d", GetLastError());
+        return NULL;
+    }
+
+    return target_handle;
+
+}
+
+int guacd_send_handles(
+        int pid, int sock, HANDLE write_handle, HANDLE read_handle) {
+
+    HANDLE dup_write = duplicate_handle(pid, write_handle);
+    if (!dup_write) {
+        guacd_log(GUAC_LOG_ERROR, 
+                "Unable to duplicate write handle: %d", GetLastError());
+        return 0;
+    }
+
+    HANDLE dup_read = duplicate_handle(pid, read_handle);
+    if (!dup_write) {
+        guacd_log(GUAC_LOG_ERROR, 
+                "Unable to duplicate read handle: %d", GetLastError());
         return 0;
     }
 
     /* 
-     * Split the handle into bytes to send across the handle.
+     * Split the handles into bytes to send across the socket.
      * NOTE: This does NOT convert to network byte order, and instead relies
      * on the target process, running on the same system, using the same byte
      * order. This should be fine...
      */
     struct msghdr message = {0};
-    char message_data[sizeof(target_handle)];
-    memcpy(&message_data, &target_handle, sizeof(target_handle));
+    char message_data[sizeof(HANDLE) * 2];
+    HANDLE* handle_data = (HANDLE*) message_data;
+    memcpy(&handle_data[0], &dup_write, sizeof(HANDLE));
+    memcpy(&handle_data[1], &dup_read, sizeof(HANDLE));
 
     /* Assign data buffer */
     struct iovec io_vector[1];
@@ -97,19 +128,19 @@ int guacd_send_handle(int pid, int sock, HANDLE handle) {
     message.msg_iov    = io_vector;
     message.msg_iovlen = 1;
 
-    guacd_log(GUAC_LOG_INFO, "Sending handle %p", target_handle);
+    guacd_log(GUAC_LOG_INFO, "Sending write handle %p", dup_write);
+    guacd_log(GUAC_LOG_INFO, "Sending read handle %p", dup_read);
 
     /* Send file descriptor */
     return (sendmsg(sock, &message, 0) == sizeof(message_data));
 
 }
 
-HANDLE guacd_recv_handle(int sock) {
-
-    HANDLE handle = NULL;
+int guacd_recv_handles(int sock, HANDLE* handles) {
 
     struct msghdr message = {0};
-    char message_data[sizeof(HANDLE)];
+    char message_data[sizeof(HANDLE) * 2];
+    HANDLE* handle_data = (HANDLE*) message_data;
 
     /* Assign data buffer */
     struct iovec io_vector[1];
@@ -121,18 +152,22 @@ HANDLE guacd_recv_handle(int sock) {
     /* Receive file descriptor */
     if (recvmsg(sock, &message, 0) == sizeof(message_data)) {
         
-        /* 
-         * Copy the data from the message to get the handle, which was
-         * previously copied into this process using DuplicateHandle()
-         */
-        memcpy(&handle, &message_data, sizeof(HANDLE));
+        /* Copy write handle data */
+        memcpy(&handles[0], &handle_data[0], sizeof(HANDLE));
+        
+        /* Copy read handle data */
+        memcpy(&handles[1], &handle_data[1], sizeof(HANDLE));
 
-        guacd_log(GUAC_LOG_INFO, "Got handle %p", handle);
+        guacd_log(GUAC_LOG_INFO, "Got write handle %p", handles[0]);
+        guacd_log(GUAC_LOG_INFO, "Got read handle %p", handles[1]);
+
+        /* Success */
+        return 1;
 
     } /* end if recvmsg() success */
 
-    /* Return the handle, if any */
-    return handle;
+    /* Failed to get handles */
+    return 0;
 
 }
 

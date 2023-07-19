@@ -28,6 +28,8 @@
 #include <openssl/ssl.h>
 #endif
 
+#include <handleapi.h>
+
 /**
  * Parameters required by each connection thread.
  */
@@ -45,6 +47,16 @@ typedef struct guacd_connection_thread_params {
      */
     SSL_CTX* ssl_context;
 #endif
+
+    /**
+     * The write handle associated with the newly-accepted connection.
+     */
+    HANDLE write_handle;
+
+    /**
+     * The read handle associated with the newly-accepted connection.
+     */
+    HANDLE read_handle;
 
     /**
      * The file descriptor associated with the newly-accepted connection.
@@ -97,6 +109,18 @@ typedef struct guacd_connection_io_thread_params {
      * connection-specific process.
      */
     int fd;
+
+    /**
+     * The write handle which is being handled by a guac_socket within the
+     * connection-specific process.
+     */
+    HANDLE write_handle;
+
+    /**
+     * The read handle which is being handled by a guac_socket within the
+     * connection-specific process.
+     */
+    HANDLE read_handle;
 
 } guacd_connection_io_thread_params;
 
