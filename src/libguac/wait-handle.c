@@ -28,53 +28,65 @@
 
 int guac_wait_for_handle(HANDLE handle, int usec_timeout) {
 
+    HANDLE event = CreateEvent(
+
+        /* YOLO: default security settings */
+        NULL,
+
+        /* Disable manual reset */
+        FALSE,
+
+        /* Initialize to not signalled so we can wait on it */
+        FALSE,
+
+        /* No name should be needed here */
+        NULL
+
+    );
+
     /* 
-     * Only wait for received data.
-     * TODO: Should this be set just once?
+     * An overlapped structure, required for IO with any handle that's opened
+     * in overlapped mode, with all fields initialized to zero to avoid errors.
      */
-    SetCommMask(handle, EV_RXCHAR);
-
-    /* New timeout configuration, specific to this wait */
-    COMMTIMEOUTS wait_timeouts;
-
-    /* Round up to the supported granularity */
-    wait_timeouts.ReadTotalTimeoutConstant = (usec_timeout + 999) / 1000;
+    OVERLAPPED overlapped = { 0 };
     
-    /* Do not set any other timeout other than the overall read timeout */
-    wait_timeouts.ReadIntervalTimeout = 0;
-    wait_timeouts.ReadTotalTimeoutMultiplier = 0;
-    wait_timeouts.WriteTotalTimeoutConstant = 0;
-    wait_timeouts.WriteTotalTimeoutMultiplier = 0;
+    /* Set the event to be used to signal comm events */
+    overlapped.hEvent = event;
 
-    fprintf(stderr, "I will set the timeouts...\n");
+    fprintf(stderr, "Attempt to read 0 bytes from %p\n", handle);
 
-    // Set the configured timeout
-    BOOL success = SetCommTimeouts(handle, &wait_timeouts);
+    /* Request to wait for new data to be available */
+    char buff[1]; 
+    if (!ReadFile(handle, &buff, 0, NULL, &overlapped)) {
         
-    fprintf(stderr, "The error was %i\n", GetLastError());
+        DWORD error = GetLastError();
 
-    if (!success)
+        /* ERROR_IO_PENDING is expected in overlapped mode */
+        if (error != ERROR_IO_PENDING) {
+            return -1;
+        }
+    }
+
+    int millis = (usec_timeout + 999) / 1000;
+    fprintf(stderr, "Waiting for %i milliseconds...\n", millis);
+    
+    DWORD result = WaitForSingleObject(event, millis);
+    fprintf(stderr, "The WaitForSingleObject result is %u\n", result);
+    
+    /* The wait attempt failed */ 
+    if (result == WAIT_FAILED) {
+        fprintf(stderr, "The WaitForSingleObject error was %i\n", GetLastError());
         return -1;
+    }
 
-    fprintf(stderr, "I have set the timeouts...\n");
+    /* The event was signalled, which should indicate data is ready */
+    else if (result == WAIT_OBJECT_0)
+        return 1;
 
     /* 
-     * The type of event that occurred. This isn't actually used, since the
-     * comm mask is already configured to only wait for EV_RXCHAR, but this
-     * argument is not optional for WaitCommEvent().
+     * If the event didn't trigger and the wait didn't fail, data just isn't 
+     * ready yet.
      */
-    DWORD event_mask;
-
-    /* Wait for new data to be available */
-    success = WaitCommEvent(handle, &event_mask, NULL);
-
-    fprintf(stderr, "I have waited for the comm event...\n");
-        
-    /* This MIGHT be the error that it returns if the wait times out... */
-    if (!success && GetLastError() == WAIT_TIMEOUT)
-        return 0;
-
-    /* Otherwise, return 1 for success and -1 for error */
-    return success ? 1 : -1;
+    return 0;
     
 }

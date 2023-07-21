@@ -105,22 +105,10 @@ typedef struct guacd_connection_io_thread_params {
     guac_socket* socket;
 
     /**
-     * The file descriptor which is being handled by a guac_socket within the
+     * The IPC handle which is being handled by a guac_socket within the
      * connection-specific process.
      */
-    int fd;
-
-    /**
-     * The write handle which is being handled by a guac_socket within the
-     * connection-specific process.
-     */
-    HANDLE write_handle;
-
-    /**
-     * The read handle which is being handled by a guac_socket within the
-     * connection-specific process.
-     */
-    HANDLE read_handle;
+    HANDLE handle;
 
 } guacd_connection_io_thread_params;
 

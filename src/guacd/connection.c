@@ -22,12 +22,13 @@
 #include "connection.h"
 #include "log.h"
 #include "move-fd.h"
-#include "move-handle.h"
+#include "move-pipe.h"
 #include "proc.h"
 #include "proc-map.h"
 
 #include <guacamole/client.h>
 #include <guacamole/error.h>
+#include <guacamole/id.h>
 #include <guacamole/parser.h>
 #include <guacamole/plugin.h>
 #include <guacamole/protocol.h>
@@ -49,14 +50,15 @@
 
 /* Windows */
 #include <io.h>
+#include <windows.h>
 
 /**
  * Behaves exactly as write(), but writes as much as possible, returning
  * successfully only if the entire buffer was written. If the write fails for
  * any reason, a negative value is returned.
  *
- * @param fd
- *     The file descriptor to write to.
+ * @param handle
+ *     The file handle to write to.
  *
  * @param buffer
  *     The buffer containing the data to be written.
@@ -69,13 +71,23 @@
  *     is guaranteed to write ALL bytes, this will always be the number of
  *     bytes specified by length unless an error occurs.
  */
-static int __write_all(int fd, char* buffer, int length) {
+static int __write_all(HANDLE handle, char* buffer, int length) {
 
-    /* Repeatedly write() until all data is written */
+    /* Repeatedly WriteFile() until all data is written */
     while (length > 0) {
+    
+        /* 
+        * An overlapped structure, required for IO with any handle that's opened
+        * in overlapped mode, with all fields initialized to zero to avoid errors.
+        */
+        OVERLAPPED overlapped = { 0 };
+        
+        if (!WriteFile(handle, buffer, length, NULL, &overlapped)) 
+            return -1;
 
-        int written = write(fd, buffer, length);
-        if (written < 0)
+        /* Wait for the async write operation to complete to get the count */
+        DWORD written;
+        if (!GetOverlappedResult(handle, &overlapped, &written, TRUE)) 
             return -1;
 
         length -= written;
@@ -89,7 +101,7 @@ static int __write_all(int fd, char* buffer, int length) {
 
 /**
  * Continuously reads from a guac_socket, writing all data read to a file
- * descriptor. Any data already buffered from that guac_socket by a given
+ * handle. Any data already buffered from that guac_socket by a given
  * guac_parser is read first, prior to reading further data from the
  * guac_socket. The provided guac_parser will be freed once its buffers have
  * been emptied, but the guac_socket will not.
@@ -115,7 +127,7 @@ static void* guacd_connection_write_thread(void* data) {
 
     /* Read all buffered data from parser first */
     while ((length = guac_parser_shift(params->parser, buffer, sizeof(buffer))) > 0) {
-        if (__write_all(params->fd, buffer, length) < 0)
+        if (__write_all(params->handle, buffer, length) < 0)
             break;
     }
 
@@ -124,7 +136,7 @@ static void* guacd_connection_write_thread(void* data) {
 
     /* Transfer data from file descriptor to socket */
     while ((length = guac_socket_read(params->socket, buffer, sizeof(buffer))) > 0) {
-        if (__write_all(params->fd, buffer, length) < 0)
+        if (__write_all(params->handle, buffer, length) < 0)
             break;
     }
 
@@ -137,16 +149,40 @@ void* guacd_connection_io_thread(void* data) {
     guacd_connection_io_thread_params* params = (guacd_connection_io_thread_params*) data;
     char buffer[8192];
 
-    int length;
-
     pthread_t write_thread;
     pthread_create(&write_thread, NULL, guacd_connection_write_thread, params);
 
     /* Transfer data from file descriptor to socket */
-    while ((length = read(params->fd, buffer, sizeof(buffer))) > 0) {
-        if (guac_socket_write(params->socket, buffer, length))
+    while (1) {
+        
+        /* 
+        * An overlapped structure, required for IO with any handle that's opened
+        * in overlapped mode, with all fields initialized to zero to avoid errors.
+        */
+        OVERLAPPED overlapped = { 0 };
+        
+        if (!ReadFile(params->handle, buffer, sizeof(buffer), NULL, &overlapped)) {
+            int error = GetLastError();
+            if (error != ERROR_IO_PENDING) {
+                fprintf(stderr, "The guacd_connection_io_thread ReadFile error was %i\n", error);
+                break; // broken - just abort I guess?
+            }
+        }
+
+        /* Wait for the async read operation to complete to get the count */
+        DWORD bytes_read;
+        if (!GetOverlappedResult(params->handle, &overlapped, &bytes_read, TRUE)) {
+            fprintf(stderr, "The GetOverlappedResult error was %i\n", GetLastError());
+            break; // broken - just abort I guess?]
+        }
+        
+        if (!bytes_read) 
+            break; // All done
+        
+        if (guac_socket_write(params->socket, buffer, bytes_read))
             break;
         guac_socket_flush(params->socket);
+
     }
 
     /* Wait for write thread to die */
@@ -154,7 +190,7 @@ void* guacd_connection_io_thread(void* data) {
 
     /* Clean up */
     guac_socket_free(params->socket);
-    close(params->fd);
+    CloseHandle(params->handle);
     free(params);
 
     return NULL;
@@ -186,54 +222,92 @@ void* guacd_connection_io_thread(void* data) {
  */
 static int guacd_add_user(guacd_proc* proc, guac_parser* parser, guac_socket* socket) {
 
-    /* Set up a pipe for transferring data from guacd to the user */
-    int to_user[2];
-    if (pipe(to_user) != 0) {
-        guacd_log(GUAC_LOG_ERROR, "Unable to create pipe for writing to user.");
+    char pipe_name[GUAC_PIPE_NAME_LENGTH];
+
+    /* Required pipe name prefix */
+    memcpy(pipe_name, PIPE_NAME_PREFIX, strlen(PIPE_NAME_PREFIX));
+
+    /* 37-character UUID */
+    char* uuid = guac_generate_id('G');
+    if (uuid == NULL) {
+        guacd_log(GUAC_LOG_ERROR, "Unable to generate UUID for pipe name.");
         return 1;
     }
 
-    /* Set up a pipe for transferring data from the user to guacd */
-    int to_guacd[2];
-    if (pipe(to_guacd) != 0) {
-        close(to_user[0]);
-        close(to_user[1]);
-        guacd_log(GUAC_LOG_ERROR, "Unable to create pipe for reading from user.");
+    memcpy(pipe_name + strlen(PIPE_NAME_PREFIX), uuid, 37);
+
+    /* Null terminator */
+    pipe_name[GUAC_PIPE_NAME_LENGTH - 1] = '\0';
+
+    /* 
+     * Set up a named pipe for communication with the user. For more, see
+     * https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
+     */
+    HANDLE pipe_handle = CreateNamedPipe(
+        pipe_name, 
+
+        /*
+         * Read/write and "overlapped" (async) modes. PIPE_WAIT ensures
+         * that completion actions do not occur until data is actually
+         * ready, i.e. it's actually possible to wait for data.
+         */
+        PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
+
+        /* Allow only one instance of this named pipe to be opened. 
+         * PIPE_WAIT ensures that completion actions do not occur until data
+         * is actually ready, i.e. it's actually possible to wait for data.
+         */
+        PIPE_TYPE_BYTE | PIPE_WAIT,
+
+        /* Only this one instance of this named pipe is needed */
+        1,
+
+        /* Output and input buffer sizes */
+        8192, 8192,
+
+        /* Use the default timeout for the unused function WaitNamedPipe() */
+        0,
+
+        /* Use the default security settings - maybe they're fine? */
+        NULL
+    );
+    
+    if (pipe_handle == INVALID_HANDLE_VALUE) {
+        fprintf(stderr, "CreateNamedPipe() failed with %i\n", GetLastError());
+        guacd_log(GUAC_LOG_ERROR, "Unable to create named pipe for IPC.");
         return 1;
     }
 
-    HANDLE guacd_to_user = (HANDLE) _get_osfhandle(to_user[1]);
-    HANDLE user_from_guacd = (HANDLE) _get_osfhandle(to_user[0]);
+    fprintf(stderr, "I created pipe %p\n", pipe_handle);
 
-    HANDLE user_to_guacd = (HANDLE) _get_osfhandle(to_guacd[1]);
-    HANDLE guacd_from_user = (HANDLE) _get_osfhandle(to_guacd[0]);
-
-    fprintf(stderr, "guacd_to_user:   %p\n", guacd_to_user);
-    fprintf(stderr, "user_from_guacd: %p\n", user_from_guacd);
-    fprintf(stderr, "user_to_guacd:   %p\n", user_to_guacd);
-    fprintf(stderr, "guacd_from_user: %p\n", guacd_from_user);
-
-    /* Send user file handles to process */
-    if (!guacd_send_handles(proc->pid, proc->fd_socket, 
-            user_to_guacd, user_from_guacd)) {
-
-        CloseHandle(guacd_to_user);
-        CloseHandle(user_from_guacd);
-        CloseHandle(user_to_guacd);
-        CloseHandle(guacd_from_user);
+    /* Send pipe name to process so it can connect to the pipe */
+    if (!guacd_send_pipe(proc->fd_socket, pipe_name)) {
+        CloseHandle(pipe_handle);
         guacd_log(GUAC_LOG_ERROR, "Unable to add user.");
         return 1;
 
     }
 
+    /* Wait for the other end of the pipe to connect before attempting any IO */
+    HANDLE event = CreateEvent(NULL, FALSE, FALSE, NULL);
+    OVERLAPPED overlapped = { 0 };
+    overlapped.hEvent = event;
+    ConnectNamedPipe(pipe_handle, &overlapped);
+        
+    // Wait for ?1 second? for the other end to be connected
+    DWORD result = WaitForSingleObject(event, 1000);
+    if (result == WAIT_FAILED) {
+        int error = GetLastError();
+        if (error != ERROR_PIPE_CONNECTED) {
+            fprintf(stderr, "The WaitForSingleObject error was %i\n", GetLastError());
+            return 1;
+        }
+    }
+
     guacd_connection_io_thread_params* params = malloc(sizeof(guacd_connection_io_thread_params));
     params->parser = parser;
     params->socket = socket;
-
-    params->write_handle = guacd_to_user;
-    params->read_handle = guacd_from_user;
-
-    // TOOD: close the unused end of the pipes once it's clear that's ok with windows
+    params->handle = pipe_handle;
 
     /* Start I/O thread */
     pthread_t io_thread;
