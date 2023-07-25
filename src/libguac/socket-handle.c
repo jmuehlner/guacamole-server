@@ -96,6 +96,8 @@ static ssize_t guac_socket_handle_write(guac_socket* socket,
 
     guac_socket_handle_data* data = (guac_socket_handle_data*) socket->data;
     const char* buffer = buf;
+    
+    size_t og_count = count;
 
     /* Write until completely written */
     while (count > 0) {
@@ -128,13 +130,20 @@ static ssize_t guac_socket_handle_write(guac_socket* socket,
             return -1;
         }
 
-        fprintf(stderr, "I wrote %u/%lu bytes to %p\n", bytes_written, count, data->handle);
+        //fprintf(stderr, "I wrote %u/%lu bytes to %p\n", bytes_written, count, data->handle);
 
         /* Advance buffer to next chunk */
         buffer += bytes_written;
         count  -= bytes_written;
 
     }
+
+    char* message = malloc(og_count + 1);
+    memcpy(message, buf, og_count);
+    message[og_count] = '\0';
+
+    fprintf(stderr, "wrote: %s\n", message);
+    free(message);
 
     return 0;
 
@@ -161,8 +170,6 @@ static ssize_t guac_socket_handle_read_handler(guac_socket* socket,
 
     guac_socket_handle_data* data = (guac_socket_handle_data*) socket->data;
 
-    fprintf(stderr, "I'm in the read handler\n");
-
     /* 
     * An overlapped structure, required for IO with any handle that's opened
     * in overlapped mode, with all fields initialized to zero to avoid errors.
@@ -188,7 +195,14 @@ static ssize_t guac_socket_handle_read_handler(guac_socket* socket,
         return -1;
     }
 
-    fprintf(stderr, "I read %u/%lu bytes from %p\n", bytes_read, count, data->handle);
+    //fprintf(stderr, "I read %u/%lu bytes from %p\n", bytes_read, count, data->handle);
+
+    char* message = malloc(bytes_read + 1);
+    memcpy(message, buf, bytes_read);
+    message[bytes_read] = '\0';
+
+    fprintf(stderr, "read: %s\n", message);
+    free(message);
 
     return bytes_read;
 
@@ -375,7 +389,7 @@ static int guac_socket_handle_select_handler(guac_socket* socket,
     /* Wait for data on socket */
     guac_socket_handle_data* data = (guac_socket_handle_data*) socket->data;
 
-    fprintf(stderr, "I will be waiting for data on %p\n", data->handle);
+    //fprintf(stderr, "I will be waiting for data on %p\n", data->handle);
 
     int retval = guac_wait_for_handle(data->handle, usec_timeout);
 

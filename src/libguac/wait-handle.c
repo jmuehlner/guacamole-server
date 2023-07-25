@@ -53,8 +53,6 @@ int guac_wait_for_handle(HANDLE handle, int usec_timeout) {
     /* Set the event to be used to signal comm events */
     overlapped.hEvent = event;
 
-    fprintf(stderr, "Attempt to read 0 bytes from %p\n", handle);
-
     /* Request to wait for new data to be available */
     char buff[1]; 
     if (!ReadFile(handle, &buff, 0, NULL, &overlapped)) {
