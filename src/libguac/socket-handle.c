@@ -108,7 +108,7 @@ static ssize_t guac_socket_handle_write(guac_socket* socket,
         */
         OVERLAPPED overlapped = { 0 };
 
-        if (!WriteFile(data->handle, buf, count, NULL, &overlapped)) {
+        if (!WriteFile(data->handle, buffer, count, NULL, &overlapped)) {
 
             DWORD error = GetLastError();
 
@@ -170,39 +170,43 @@ static ssize_t guac_socket_handle_read_handler(guac_socket* socket,
 
     guac_socket_handle_data* data = (guac_socket_handle_data*) socket->data;
 
-    /* 
-    * An overlapped structure, required for IO with any handle that's opened
-    * in overlapped mode, with all fields initialized to zero to avoid errors.
-    */
-    OVERLAPPED overlapped = { 0 };
-    
-    if (!ReadFile(data->handle, buf, count, NULL, &overlapped)) {
-        int error = GetLastError();
-        if (error != ERROR_IO_PENDING) {
-            fprintf(stderr, "The ReadFile error was %i\n", error);
+    DWORD bytes_read = 0;
+    do {
+
+        /* 
+        * An overlapped structure, required for IO with any handle that's opened
+        * in overlapped mode, with all fields initialized to zero to avoid errors.
+        */
+        OVERLAPPED overlapped = { 0 };
+        
+        if (!ReadFile(data->handle, buf, count, NULL, &overlapped)) {
+            int error = GetLastError();
+            if (error != ERROR_IO_PENDING) {
+                fprintf(stderr, "The ReadFile error was %i\n", error);
+                guac_error = GUAC_STATUS_SEE_LAST_ERROR;
+                guac_error_message = "Error reading data from handle";
+                return -1;
+            }
+        }
+
+        /* Wait for the async read operation to complete to get the count */
+        if (!GetOverlappedResult(data->handle, &overlapped, &bytes_read, TRUE)) {
+            fprintf(stderr, "The GetOverlappedResult error was %i\n", GetLastError());
             guac_error = GUAC_STATUS_SEE_LAST_ERROR;
             guac_error_message = "Error reading data from handle";
             return -1;
         }
-    }
 
-    /* Wait for the async read operation to complete to get the count */
-    DWORD bytes_read;
-    if (!GetOverlappedResult(data->handle, &overlapped, &bytes_read, TRUE)) {
-        fprintf(stderr, "The GetOverlappedResult error was %i\n", GetLastError());
-        guac_error = GUAC_STATUS_SEE_LAST_ERROR;
-        guac_error_message = "Error reading data from handle";
-        return -1;
-    }
+        //fprintf(stderr, "I read %u/%lu bytes from %p\n", bytes_read, count, data->handle);
 
-    //fprintf(stderr, "I read %u/%lu bytes from %p\n", bytes_read, count, data->handle);
+        char* message = malloc(bytes_read + 1);
+        memcpy(message, buf, bytes_read);
+        message[bytes_read] = '\0';
 
-    char* message = malloc(bytes_read + 1);
-    memcpy(message, buf, bytes_read);
-    message[bytes_read] = '\0';
+        fprintf(stderr, "read: %s\n", message);
+        free(message);
 
-    fprintf(stderr, "read: %s\n", message);
-    free(message);
+    } while(bytes_read == 0);
 
     return bytes_read;
 
@@ -351,6 +355,15 @@ static ssize_t guac_socket_handle_write_buffered(guac_socket* socket,
  */
 static ssize_t guac_socket_handle_write_handler(guac_socket* socket,
         const void* buf, size_t count) {
+
+            
+    char* message = malloc(count + 1);
+    memcpy(message, buf, count);
+    message[count] = '\0';
+
+    fprintf(stderr, "I am supposed to write: %s\n", message);
+
+    free(message);
 
     int retval;
     guac_socket_handle_data* data = (guac_socket_handle_data*) socket->data;

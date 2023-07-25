@@ -164,7 +164,7 @@ void* guacd_connection_io_thread(void* data) {
         if (!ReadFile(params->handle, buffer, sizeof(buffer), NULL, &overlapped)) {
             int error = GetLastError();
             if (error != ERROR_IO_PENDING) {
-                fprintf(stderr, "The guacd_connection_io_thread ReadFile error was %i\n", error);
+                fprintf(stderr, "The guacd_connection_io_thread ReadFile error was %i. Breaking!\n", error);
                 break; // broken - just abort I guess?
             }
         }
@@ -172,15 +172,27 @@ void* guacd_connection_io_thread(void* data) {
         /* Wait for the async read operation to complete to get the count */
         DWORD bytes_read;
         if (!GetOverlappedResult(params->handle, &overlapped, &bytes_read, TRUE)) {
-            fprintf(stderr, "The GetOverlappedResult error was %i\n", GetLastError());
+            fprintf(stderr, "The GetOverlappedResult error was %i. Breaking!\n", GetLastError());
             break; // broken - just abort I guess?]
         }
         
-        if (!bytes_read) 
+        /*if (!bytes_read) {
+            fprintf(stderr, "bytes_read is %i. Breaking!\n", bytes_read);
             break; // All done
+        }*/
+
+        /*
+        char* message = malloc(bytes_read + 1);
+        memcpy(message, buffer, bytes_read);
+        message[bytes_read] = '\0';
+        fprintf(stderr, "Server read: %s\n", message);
+        free(message);
+        */
         
-        if (guac_socket_write(params->socket, buffer, bytes_read))
+        if (guac_socket_write(params->socket, buffer, bytes_read)) {
+            fprintf(stderr, "guac_socket_write() failed ... Breaking!\n");
             break;
+        }
         guac_socket_flush(params->socket);
 
     }
@@ -492,7 +504,7 @@ void* guacd_connection_thread(void* data) {
 
 #else
     /* Open guac_socket */
-    socket = guac_socket_open_handle(connected_socket_fd);
+    socket = guac_socket_open(connected_handle);
 #endif
 
     /* Route connection according to Guacamole, creating a new process if needed */

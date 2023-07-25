@@ -49,16 +49,6 @@ typedef struct guacd_connection_thread_params {
 #endif
 
     /**
-     * The write handle associated with the newly-accepted connection.
-     */
-    HANDLE write_handle;
-
-    /**
-     * The read handle associated with the newly-accepted connection.
-     */
-    HANDLE read_handle;
-
-    /**
      * The file descriptor associated with the newly-accepted connection.
      */
     int connected_socket_fd;
