@@ -47,14 +47,11 @@ int guac_wait_for_handle(HANDLE handle, int usec_timeout) {
     }
 
     int millis = (usec_timeout + 999) / 1000;
-    //fprintf(stderr, "Waiting for %i milliseconds...\n", millis);
     
     DWORD result = WaitForSingleObject(event, millis);
-    //fprintf(stderr, "The WaitForSingleObject result is %u\n", result);
     
     /* The wait attempt failed */ 
     if (result == WAIT_FAILED) {
-        fprintf(stderr, "The WaitForSingleObject error was %i\n", GetLastError());
         return -1;
     }
 

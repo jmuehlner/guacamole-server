@@ -148,24 +148,13 @@ void* guacd_connection_io_thread(void* data) {
         
         DWORD bytes_read;
         if (guac_read_from_handle(params->handle, buffer, sizeof(buffer), &bytes_read)) {
-            fprintf(stderr, "The guacd_connection_io_thread ReadFile error was %i. Breaking!\n", GetLastError());
             break; // broken - just abort I guess?
-        }
-
-        if (bytes_read) {
-            FILE* the_file = fopen("/tmp/web.txt", "a");
-            char* message = malloc(bytes_read + 1);
-            memcpy(message, buffer, bytes_read);
-            message[bytes_read] = '\0';
-            fprintf(the_file, "%s\n", message);
-            fclose(the_file);
-            free(message);
         }
         
         if (guac_socket_write(params->socket, buffer, bytes_read)) {
-            fprintf(stderr, "guac_socket_write() failed ... Breaking!\n");
             break;
         }
+
         guac_socket_flush(params->socket);
 
     }
@@ -258,12 +247,9 @@ static int guacd_add_user(guacd_proc* proc, guac_parser* parser, guac_socket* so
     );
     
     if (pipe_handle == INVALID_HANDLE_VALUE) {
-        fprintf(stderr, "CreateNamedPipe() failed with %i\n", GetLastError());
         guacd_log(GUAC_LOG_ERROR, "Unable to create named pipe for IPC.");
         return 1;
     }
-
-    // fprintf(stderr, "I created pipe %p\n", pipe_handle);
 
     /* Send pipe name to process so it can connect to the pipe */
     if (!guacd_send_pipe(proc->fd_socket, pipe_name)) {
@@ -282,9 +268,12 @@ static int guacd_add_user(guacd_proc* proc, guac_parser* parser, guac_socket* so
     // Wait for ?1 second? for the other end to be connected
     DWORD result = WaitForSingleObject(event, 1000);
     if (result == WAIT_FAILED) {
-        int error = GetLastError();
-        if (error != ERROR_PIPE_CONNECTED) {
-            fprintf(stderr, "The WaitForSingleObject error was %i\n", GetLastError());
+
+        /* 
+         * If the wait failed for any reason other than the pipe being
+         * already connected 
+         */
+        if (GetLastError() != ERROR_PIPE_CONNECTED) {
             return 1;
         }
     }

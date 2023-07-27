@@ -76,9 +76,7 @@ HANDLE guacd_recv_pipe(int sock) {
          */
         pipe_name[GUAC_PIPE_NAME_LENGTH - 1] = '\0';
 
-        fprintf(stderr, "I got a pipe named %s\n", pipe_name);
-
-        HANDLE pipe_handle = CreateFile(
+        return CreateFile(
 
             pipe_name,
 
@@ -95,21 +93,11 @@ HANDLE guacd_recv_pipe(int sock) {
             OPEN_EXISTING,
 
             /* Open in "overlapped" (async) mode */
-            FILE_FLAG_OVERLAPPED,
+            FILE_FLAG_NO_BUFFERING | FILE_FLAG_OVERLAPPED,
 
             /* Ignored for existing pipes */
             NULL
         );
-
-        fprintf(stderr, "The pipe handle is %p\n", pipe_handle);
-
-        if (pipe_handle == NULL) {
-            fprintf(stderr, "CreateFile() failed with %u\n", GetLastError());
-            return NULL;
-        }
-        
-        /* Success */
-        return pipe_handle;
 
     } /* end if recvmsg() success */
 

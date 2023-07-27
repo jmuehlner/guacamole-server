@@ -56,8 +56,6 @@ static ssize_t __guac_socket_ssl_write_handler(guac_socket* socket,
 
     retval = SSL_write(data->ssl, buf, count);
 
-    fprintf(stderr, "I wrote %i bytes to the SSL\n", retval);
-
     /* Record errors in guac_error */
     if (retval <= 0) {
         guac_error = GUAC_STATUS_SEE_ERRNO;
