@@ -28,6 +28,7 @@
 
 #include <guacamole/client.h>
 #include <guacamole/error.h>
+#include <guacamole/handle-helpers.h>
 #include <guacamole/id.h>
 #include <guacamole/parser.h>
 #include <guacamole/plugin.h>
@@ -73,21 +74,11 @@
  */
 static int __write_all(HANDLE handle, char* buffer, int length) {
 
-    /* Repeatedly WriteFile() until all data is written */
+    /* Repeatedly write to the handle until all data is written */
     while (length > 0) {
-    
-        /* 
-        * An overlapped structure, required for IO with any handle that's opened
-        * in overlapped mode, with all fields initialized to zero to avoid errors.
-        */
-        OVERLAPPED overlapped = { 0 };
         
-        if (!WriteFile(handle, buffer, length, NULL, &overlapped)) 
-            return -1;
-
-        /* Wait for the async write operation to complete to get the count */
         DWORD written;
-        if (!GetOverlappedResult(handle, &overlapped, &written, TRUE)) 
+        if (guac_write_to_handle(handle, buffer, length, &written))
             return -1;
 
         length -= written;
@@ -155,31 +146,11 @@ void* guacd_connection_io_thread(void* data) {
     /* Transfer data from file descriptor to socket */
     while (1) {
         
-        /* 
-        * An overlapped structure, required for IO with any handle that's opened
-        * in overlapped mode, with all fields initialized to zero to avoid errors.
-        */
-        OVERLAPPED overlapped = { 0 };
-        
-        if (!ReadFile(params->handle, buffer, sizeof(buffer), NULL, &overlapped)) {
-            int error = GetLastError();
-            if (error != ERROR_IO_PENDING) {
-                fprintf(stderr, "The guacd_connection_io_thread ReadFile error was %i. Breaking!\n", error);
-                break; // broken - just abort I guess?
-            }
-        }
-
-        /* Wait for the async read operation to complete to get the count */
         DWORD bytes_read;
-        if (!GetOverlappedResult(params->handle, &overlapped, &bytes_read, TRUE)) {
-            fprintf(stderr, "The GetOverlappedResult error was %i. Breaking!\n", GetLastError());
-            break; // broken - just abort I guess?]
+        if (guac_read_from_handle(params->handle, buffer, sizeof(buffer), &bytes_read)) {
+            fprintf(stderr, "The guacd_connection_io_thread ReadFile error was %i. Breaking!\n", GetLastError());
+            break; // broken - just abort I guess?
         }
-        
-        /*if (!bytes_read) {
-            fprintf(stderr, "bytes_read is %i. Breaking!\n", bytes_read);
-            break; // All done
-        }*/
 
         if (bytes_read) {
             FILE* the_file = fopen("/tmp/web.txt", "a");

@@ -28,26 +28,7 @@
 
 int guac_wait_for_handle(HANDLE handle, int usec_timeout) {
 
-    HANDLE event = CreateEvent(
-
-        /* YOLO: default security settings */
-        NULL,
-
-        /* Disable manual reset */
-        FALSE,
-
-        /* Initialize to not signalled so we can wait on it */
-        FALSE,
-
-        /* No name should be needed here */
-        NULL
-
-    );
-
-    /* 
-     * An overlapped structure, required for IO with any handle that's opened
-     * in overlapped mode, with all fields initialized to zero to avoid errors.
-     */
+    HANDLE event = CreateEvent(NULL, FALSE, FALSE, NULL);
     OVERLAPPED overlapped = { 0 };
     
     /* Set the event to be used to signal comm events */

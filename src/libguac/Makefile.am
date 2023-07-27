@@ -136,8 +136,10 @@ libguacinc_HEADERS += guacamole/socket-wsa.h
 endif
 
 # TODO: Conditional windows stuff
+libguac_la_SOURCES += handle-helpers.c
 libguac_la_SOURCES += socket-handle.c
 libguac_la_SOURCES += wait-handle.c
+libguacinc_HEADERS += guacamole/handle-helpers.h
 libguacinc_HEADERS += guacamole/socket-handle.h
 libguacinc_HEADERS += guacamole/wait-handle.h
 
