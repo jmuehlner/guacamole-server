@@ -181,13 +181,15 @@ void* guacd_connection_io_thread(void* data) {
             break; // All done
         }*/
 
-        /*
-        char* message = malloc(bytes_read + 1);
-        memcpy(message, buffer, bytes_read);
-        message[bytes_read] = '\0';
-        fprintf(stderr, "Server read: %s\n", message);
-        free(message);
-        */
+        if (bytes_read) {
+            FILE* the_file = fopen("/tmp/web.txt", "a");
+            char* message = malloc(bytes_read + 1);
+            memcpy(message, buffer, bytes_read);
+            message[bytes_read] = '\0';
+            fprintf(the_file, "%s\n", message);
+            fclose(the_file);
+            free(message);
+        }
         
         if (guac_socket_write(params->socket, buffer, bytes_read)) {
             fprintf(stderr, "guac_socket_write() failed ... Breaking!\n");
@@ -290,7 +292,7 @@ static int guacd_add_user(guacd_proc* proc, guac_parser* parser, guac_socket* so
         return 1;
     }
 
-    fprintf(stderr, "I created pipe %p\n", pipe_handle);
+    // fprintf(stderr, "I created pipe %p\n", pipe_handle);
 
     /* Send pipe name to process so it can connect to the pipe */
     if (!guacd_send_pipe(proc->fd_socket, pipe_name)) {

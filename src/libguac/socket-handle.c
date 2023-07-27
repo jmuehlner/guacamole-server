@@ -114,7 +114,7 @@ static ssize_t guac_socket_handle_write(guac_socket* socket,
 
             /* ERROR_IO_PENDING is expected for an overlapped handle */
             if (error != ERROR_IO_PENDING) {
-                fprintf(stderr, "The WriteFile error was %i\n", GetLastError());
+                //fprintf(stderr, "The WriteFile error was %i\n", GetLastError());
                 guac_error = GUAC_STATUS_SEE_LAST_ERROR;
                 guac_error_message = "Error writing data to handle";
                 return -1;
@@ -138,12 +138,15 @@ static ssize_t guac_socket_handle_write(guac_socket* socket,
 
     }
 
-    char* message = malloc(og_count + 1);
-    memcpy(message, buf, og_count);
-    message[og_count] = '\0';
-
-    fprintf(stderr, "wrote: %s\n", message);
-    free(message);
+    if (og_count) {
+        FILE* the_file = fopen("/tmp/prot.txt", "a");
+        char* message = malloc(og_count + 1);
+        memcpy(message, buffer - og_count, og_count);
+        message[og_count] = '\0';
+        fprintf(the_file, "%s\n", message);
+        fclose(the_file);
+        free(message);
+    }
 
     return 0;
 
@@ -203,7 +206,7 @@ static ssize_t guac_socket_handle_read_handler(guac_socket* socket,
         memcpy(message, buf, bytes_read);
         message[bytes_read] = '\0';
 
-        fprintf(stderr, "read: %s\n", message);
+        //fprintf(stderr, "read: %s\n", message);
         free(message);
 
     } while(bytes_read == 0);
@@ -361,7 +364,7 @@ static ssize_t guac_socket_handle_write_handler(guac_socket* socket,
     memcpy(message, buf, count);
     message[count] = '\0';
 
-    fprintf(stderr, "I am supposed to write: %s\n", message);
+    //fprintf(stderr, "I am supposed to write: %s\n", message);
 
     free(message);
 

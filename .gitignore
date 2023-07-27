@@ -1,3 +1,4 @@
+*.stackdump
 
 # Object code
 *.o
