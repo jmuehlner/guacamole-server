@@ -135,6 +135,16 @@ libguac_la_SOURCES += socket-wsa.c
 libguacinc_HEADERS += guacamole/socket-wsa.h
 endif
 
+# Cygwin build
+if CYGWIN_BUILD
+libguac_la_SOURCES += handle-helpers.c
+libguac_la_SOURCES += socket-handle.c
+libguac_la_SOURCES += wait-handle.c
+libguacinc_HEADERS += guacamole/handle-helpers.h
+libguacinc_HEADERS += guacamole/socket-handle.h
+libguacinc_HEADERS += guacamole/wait-handle.h
+endif
+
 libguac_la_CFLAGS = \
     -Werror -Wall -pedantic
 

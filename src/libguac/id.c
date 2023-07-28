@@ -20,7 +20,7 @@
 #include "config.h"
 
 #include "guacamole/error.h"
-#include "id.h"
+#include <guacamole/id.h>
 
 #if defined(HAVE_LIBUUID)
 #include <uuid/uuid.h>
