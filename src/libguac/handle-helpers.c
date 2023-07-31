@@ -17,6 +17,8 @@
  * under the License.
  */
 
+
+#include "guacamole/error.h"
 #include "guacamole/handle-helpers.h"
 
 #include <errhandlingapi.h>
@@ -47,8 +49,9 @@ int guac_read_from_handle(
          * If an error other than the expected ERROR_IO_PENDING happens,
          * return it as the error code immediately.
          */ 
-        if (error != ERROR_IO_PENDING)
+        if (error != ERROR_IO_PENDING) {
             return error;
+        }
         
     }
 

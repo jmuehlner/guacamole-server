@@ -97,19 +97,19 @@ static ssize_t guac_socket_handle_write(guac_socket* socket,
 
     guac_socket_handle_data* data = (guac_socket_handle_data*) socket->data;
     const char* buffer = buf;
-    
-    size_t og_count = count;
 
     /* Write until completely written */
     while (count > 0) {
 
         DWORD bytes_written;
-        if (guac_write_to_handle(data->handle, buffer, count, &bytes_written)) {
 
-            guac_error = GUAC_STATUS_SEE_LAST_ERROR;
+        DWORD error = guac_write_to_handle(data->handle, buffer, count, &bytes_written);
+
+        if (error) {
+            guac_error = GUAC_STATUS_SEE_WINDOWS_ERROR;
+            guac_windows_error_code = error;
             guac_error_message = "Error writing data to handle";
             return -1;
-
         }
 
         /* Advance buffer to next chunk */
@@ -146,8 +146,10 @@ static ssize_t guac_socket_handle_read_handler(guac_socket* socket,
     DWORD bytes_read;
     do {
         
-        if (guac_read_from_handle(data->handle, buf, count, &bytes_read)) {
-            guac_error = GUAC_STATUS_SEE_LAST_ERROR;
+        DWORD error = guac_read_from_handle(data->handle, buf, count, &bytes_read);
+        if (error) {
+            guac_error = GUAC_STATUS_SEE_WINDOWS_ERROR;
+            guac_windows_error_code = error;
             guac_error_message = "Error reading data from handle";
             return -1;
         }
@@ -339,17 +341,21 @@ static int guac_socket_handle_select_handler(guac_socket* socket,
     int retval = guac_wait_for_handle(data->handle, usec_timeout);
 
     /* Properly set guac_error */
-    if (retval < 0) {
-        guac_error = GUAC_STATUS_SEE_LAST_ERROR;
+    if (retval > 0) {
+        guac_error = GUAC_STATUS_SEE_WINDOWS_ERROR;
+        guac_windows_error_code = retval;
         guac_error_message = "Error while waiting for data on handle";
+        return -1;
     }
 
-    else if (retval == 0) {
+    else if (retval < 0) {
         guac_error = GUAC_STATUS_TIMEOUT;
         guac_error_message = "Timeout while waiting for data on handle";
+        return 0;
     }
 
-    return retval;
+    /* Data is ready */
+    return 1;
 
 }
 

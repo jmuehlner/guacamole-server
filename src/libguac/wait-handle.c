@@ -41,9 +41,9 @@ int guac_wait_for_handle(HANDLE handle, int usec_timeout) {
         DWORD error = GetLastError();
 
         /* ERROR_IO_PENDING is expected in overlapped mode */
-        if (error != ERROR_IO_PENDING) {
-            return -1;
-        }
+        if (error != ERROR_IO_PENDING) 
+            return error;
+
     }
 
     int millis = (usec_timeout + 999) / 1000;
@@ -51,18 +51,17 @@ int guac_wait_for_handle(HANDLE handle, int usec_timeout) {
     DWORD result = WaitForSingleObject(event, millis);
     
     /* The wait attempt failed */ 
-    if (result == WAIT_FAILED) {
-        return -1;
-    }
+    if (result == WAIT_FAILED)
+        return GetLastError();
 
     /* The event was signalled, which should indicate data is ready */
     else if (result == WAIT_OBJECT_0)
-        return 1;
+        return 0;
 
     /* 
      * If the event didn't trigger and the wait didn't fail, data just isn't 
      * ready yet.
      */
-    return 0;
+    return -1;
     
 }

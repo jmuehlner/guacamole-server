@@ -66,7 +66,7 @@ typedef enum guac_status {
      * An error occurred, and further information about the error can be
      * retrieved using the GetLastError function.
      */
-    GUAC_STATUS_SEE_LAST_ERROR,
+    GUAC_STATUS_SEE_WINDOWS_ERROR,
 
 #endif
 
