@@ -284,6 +284,47 @@ static int guacd_add_user(guacd_proc* proc, guac_parser* parser, guac_socket* so
     /* Null terminator */
     pipe_name[GUAC_PIPE_NAME_LENGTH - 1] = '\0';
 
+    SECURITY_DESCRIPTOR  security_descriptor = { 0 };
+    PSECURITY_DESCRIPTOR p_security_descriptor = NULL;
+    DWORD descriptor_size;
+
+    /*
+     * Attempt to create a Windows security descriptor that grants access only
+     * to the owner of this process.
+     */
+    if (ConvertStringSecurityDescriptorToSecurityDescriptor(
+
+            /* SDDL string granting access only to the owner (OW) */
+            "D:P(A;;GA;;;OW)",
+            SDDL_REVISION_1,
+
+            /* The populated security descriptor output */
+            &p_security_descriptor,
+
+            /* Capture the descriptor size */
+            &descriptor_size
+
+    )) {
+
+        /* Attempt to initialize the security descriptor */
+        if (InitializeSecurityDescriptor(&security_descriptor, SECURITY_DESCRIPTOR_REVISION)) {
+            if (!SetSecurityDescriptorDacl(&security_descriptor, TRUE, p_security_descriptor, FALSE)) {
+                guacd_log(GUAC_LOG_ERROR, "Unable to set ACL for named pipe security descriptor.");
+                LocalFree(p_security_descriptor);
+                return 1;
+            }
+        } 
+        
+        else {
+            guacd_log(GUAC_LOG_ERROR, "Unable to initialize named pipe security descriptor.");
+            LocalFree(p_security_descriptor);
+            return 1;
+        }
+    }
+
+    SECURITY_ATTRIBUTES security_attributes = {
+            descriptor_size, &security_descriptor, FALSE };
+
     /* 
      * Set up a named pipe for communication with the user. For more, see
      * https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
@@ -301,8 +342,9 @@ static int guacd_add_user(guacd_proc* proc, guac_parser* parser, guac_socket* so
         /* Allow only one instance of this named pipe to be opened. 
          * PIPE_WAIT ensures that completion actions do not occur until data
          * is actually ready, i.e. it's actually possible to wait for data.
+         * Also, allow only connections from the local machine.
          */
-        PIPE_TYPE_BYTE | PIPE_WAIT,
+        PIPE_TYPE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
 
         /* Only this one instance of this named pipe is needed */
         1,
@@ -313,9 +355,12 @@ static int guacd_add_user(guacd_proc* proc, guac_parser* parser, guac_socket* so
         /* Use the default timeout for the unused function WaitNamedPipe() */
         0,
 
-        /* Use the default security settings - maybe they're fine? */
-        NULL
+        /* Set our custom security descriptor to allow only owner usage */
+        &security_attributes
+
     );
+
+    LocalFree(p_security_descriptor);
     
     if (pipe_handle == INVALID_HANDLE_VALUE) {
         guacd_log(GUAC_LOG_ERROR, "Unable to create named pipe for IPC.");
