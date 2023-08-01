@@ -20,6 +20,7 @@
 #ifndef GUACD_MOVE_HANDLE_H
 #define GUACD_MOVE_HANDLE_H
 
+#include <guacamole/id.h>
 #include <handleapi.h>
 
 /*
@@ -29,10 +30,10 @@
 
 /* 
  * The length of a named pipe as used by guacamole. Every pipe name will consist
- * of PIPE_NAME_PREFIX, plus a 37 character UUID as returned from guac_generate_id,
- * plus a null-terminator.
+ * of PIPE_NAME_PREFIX, plus a the length of a UUID as returned from
+ * guac_generate_id(), plus a null-terminator.
  */
-#define GUAC_PIPE_NAME_LENGTH (strlen(PIPE_NAME_PREFIX) + 37 + 1)
+#define GUAC_PIPE_NAME_LENGTH (strlen(PIPE_NAME_PREFIX) + GUAC_UUID_LEN + 1)
 
 /**
  * Sends the given pipe name along the given socket. Returns non-zero on success, 

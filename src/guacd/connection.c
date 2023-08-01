@@ -48,6 +48,7 @@
 #ifdef CYGWIN_BUILD
 
 #include <io.h>
+#include <sddl.h>
 #include <windows.h>
 
 #include <guacamole/handle-helpers.h>
@@ -271,14 +272,14 @@ static int guacd_add_user(guacd_proc* proc, guac_parser* parser, guac_socket* so
     /* Required pipe name prefix */
     memcpy(pipe_name, PIPE_NAME_PREFIX, strlen(PIPE_NAME_PREFIX));
 
-    /* 37-character UUID */
+    /* UUID to ensure the pipe name is unique */
     char* uuid = guac_generate_id('G');
     if (uuid == NULL) {
         guacd_log(GUAC_LOG_ERROR, "Unable to generate UUID for pipe name.");
         return 1;
     }
 
-    memcpy(pipe_name + strlen(PIPE_NAME_PREFIX), uuid, 37);
+    memcpy(pipe_name + strlen(PIPE_NAME_PREFIX), uuid, GUAC_UUID_LEN);
 
     /* Null terminator */
     pipe_name[GUAC_PIPE_NAME_LENGTH - 1] = '\0';
@@ -320,13 +321,16 @@ static int guacd_add_user(guacd_proc* proc, guac_parser* parser, guac_socket* so
         guacd_log(GUAC_LOG_ERROR, "Unable to create named pipe for IPC.");
         return 1;
     }
+    
+    /* If pipe creation failed, the error will already have been logged */
+    if (pipe_handle == NULL)
+        return 1;
 
     /* Send pipe name to process so it can connect to the pipe */
     if (!guacd_send_pipe(proc->fd_socket, pipe_name)) {
         CloseHandle(pipe_handle);
         guacd_log(GUAC_LOG_ERROR, "Unable to add user.");
         return 1;
-
     }
 
     /* Wait for the other end of the pipe to connect before attempting IO */

@@ -46,6 +46,7 @@ libguacinc_HEADERS =                  \
     guacamole/error-types.h           \
     guacamole/fips.h                  \
     guacamole/hash.h                  \
+    guacamole/id.h                    \
     guacamole/layer.h                 \
     guacamole/layer-types.h           \
     guacamole/object.h                \
@@ -79,7 +80,6 @@ libguacinc_HEADERS =                  \
     guacamole/wol-constants.h
 
 noinst_HEADERS =      \
-    id.h              \
     encode-jpeg.h     \
     encode-png.h      \
     palette.h         \
