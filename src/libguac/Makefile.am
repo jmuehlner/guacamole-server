@@ -151,6 +151,7 @@ libguac_la_CFLAGS = \
 libguac_la_LDFLAGS =     \
     -version-info 22:0:1 \
     -no-undefined        \
+    -lws2_32             \
     @CAIRO_LIBS@         \
     @DL_LIBS@            \
     @JPEG_LIBS@          \

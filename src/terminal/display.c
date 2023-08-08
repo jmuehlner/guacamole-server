@@ -25,6 +25,7 @@
 #include "terminal/terminal.h"
 #include "terminal/terminal-priv.h"
 #include "terminal/types.h"
+#include "terminal/wcwidth.h"
 
 #include <math.h>
 #include <stdlib.h>

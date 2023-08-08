@@ -111,7 +111,12 @@ guac_terminal_typescript* guac_terminal_typescript_alloc(const char* path,
         const char* name, int create_path) {
 
     /* Create path if it does not exist, fail if impossible */
+
+#ifdef WIN32
+    if (create_path && mkdir(path)
+#else
     if (create_path && mkdir(path, S_IRWXU | S_IRGRP | S_IXGRP)
+#endif
             && errno != EEXIST)
         return NULL;
 

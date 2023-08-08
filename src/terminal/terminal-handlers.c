@@ -26,6 +26,7 @@
 #include "terminal/terminal-priv.h"
 #include "terminal/types.h"
 #include "terminal/xparsecolor.h"
+#include "terminal/wcwidth.h"
 
 #include <guacamole/client.h>
 #include <guacamole/protocol.h>

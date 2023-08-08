@@ -26,9 +26,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+
+#ifdef WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#endif
 
 /**
  * Generate the magic Wake-on-LAN (WoL) packet for the specified MAC address
@@ -135,7 +142,7 @@ static ssize_t __guac_wol_send_packet(const char* broadcast_addr,
         int wol_bcast = 1;
 
         /* Attempt to set IPv4 broadcast; exit with error if this fails. */
-        if (setsockopt(wol_socket, SOL_SOCKET, SO_BROADCAST, &wol_bcast,
+        if (setsockopt(wol_socket, SOL_SOCKET, SO_BROADCAST, (const char *) &wol_bcast,
                 sizeof(wol_bcast)) < 0) {
             close(wol_socket);
             guac_error = GUAC_STATUS_SEE_ERRNO;
@@ -151,7 +158,7 @@ static ssize_t __guac_wol_send_packet(const char* broadcast_addr,
         int hops = 1;
         
         /* Attempt to set IPv6 multicast; exit with error if this fails. */
-        if (setsockopt(wol_socket, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &hops,
+        if (setsockopt(wol_socket, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, (const char *) &hops,
                 sizeof(hops)) < 0) {
             close(wol_socket);
             guac_error = GUAC_STATUS_SEE_ERRNO;
@@ -161,7 +168,7 @@ static ssize_t __guac_wol_send_packet(const char* broadcast_addr,
     }
     
     /* Send the packet and return number of bytes sent. */
-    int bytes = sendto(wol_socket, packet, GUAC_WOL_PACKET_SIZE, 0,
+    int bytes = sendto(wol_socket, (const char *) packet, GUAC_WOL_PACKET_SIZE, 0,
             (struct sockaddr*) &wol_dest, sizeof(wol_dest));
     close(wol_socket);
     return bytes;

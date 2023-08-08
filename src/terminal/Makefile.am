@@ -44,6 +44,7 @@ noinst_HEADERS =                 \
     terminal/terminal-handlers.h \
     terminal/types.h             \
     terminal/typescript.h        \
+    terminal/wcwidth.h           \
     terminal/xparsecolor.h
 
 libguac_terminalinc_HEADERS =    \
@@ -63,6 +64,7 @@ libguac_terminal_la_SOURCES =   \
     terminal-handlers.c         \
     terminal-stdin-stream.c     \
     typescript.c                \
+    wcwidth.c                   \
     xparsecolor.c
 
 libguac_terminal_la_CFLAGS = \

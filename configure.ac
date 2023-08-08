@@ -32,6 +32,8 @@ AC_CONFIG_MACRO_DIR([m4])
 # Use TAP test driver for tests (part of automake)
 AC_REQUIRE_AUX_FILE([tap-driver.sh])
 
+AC_DEFINE([_WIN32_WINNT], [0x0600], [support vista+])
+
 # Programs
 AC_PROG_CC
 AC_PROG_CC_C99

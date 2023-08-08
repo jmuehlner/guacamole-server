@@ -20,6 +20,11 @@
 #ifndef GUAC_TERMINAL_PALETTE_H
 #define GUAC_TERMINAL_PALETTE_H
 
+#ifdef WIN32
+#include "config.h"
+#endif
+
+
 /**
  * Constants, structures, and function definitions related to the terminal color pallate.
  *

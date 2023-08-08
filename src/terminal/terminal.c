@@ -32,6 +32,7 @@
 #include "terminal/terminal-priv.h"
 #include "terminal/types.h"
 #include "terminal/typescript.h"
+#include "terminal/wcwidth.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -49,6 +50,12 @@
 #include <guacamole/protocol.h>
 #include <guacamole/socket.h>
 #include <guacamole/timestamp.h>
+
+#ifdef WIN32
+#include "config.h"
+#include <fcntl.h>
+#define pipe(fds) _pipe(fds, 1024, _O_BINARY)
+#endif
 
 /**
  * Sets the given range of columns to the given character.
