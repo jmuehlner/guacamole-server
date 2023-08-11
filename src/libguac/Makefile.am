@@ -82,6 +82,7 @@ noinst_HEADERS =      \
     id.h              \
     encode-jpeg.h     \
     encode-png.h      \
+    local-lock.h      \
     palette.h         \
     user-handlers.h   \
     raw_encoder.h     \
@@ -97,6 +98,7 @@ libguac_la_SOURCES =   \
     fips.c             \
     hash.c             \
     id.c               \
+    local-lock.c       \
     palette.c          \
     parser.c           \
     pool.c             \

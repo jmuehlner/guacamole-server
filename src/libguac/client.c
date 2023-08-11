@@ -34,6 +34,7 @@
 #include "guacamole/timestamp.h"
 #include "guacamole/user.h"
 #include "id.h"
+#include "local-lock.h"
 
 #include <dlfcn.h>
 #include <inttypes.h>
@@ -176,6 +177,9 @@ guac_client* guac_client_alloc() {
 
     pthread_rwlock_init(&(client->__users_lock), &lock_attributes);
 
+    /* Init the write-lock flag to 0, as threads won't have it yet */
+    pthread_key_create(&(client->__users_lock_key), (void *) 0);
+
     /* Set up socket to broadcast to all users */
     client->socket = guac_socket_broadcast(client);
 
@@ -216,6 +220,7 @@ void guac_client_free(guac_client* client) {
     }
 
     pthread_rwlock_destroy(&(client->__users_lock));
+    pthread_key_delete(client->__users_lock_key);
     free(client->connection_id);
     free(client);
 }
@@ -285,7 +290,8 @@ int guac_client_add_user(guac_client* client, guac_user* user, int argc, char** 
     if (client->join_handler)
         retval = client->join_handler(user, argc, argv);
 
-    pthread_rwlock_wrlock(&(client->__users_lock));
+    guac_acquire_write_lock_if_needed(
+            &(client->__users_lock), client->__users_lock_key);
 
     /* Add to list if join was successful */
     if (retval == 0) {
@@ -305,7 +311,8 @@ int guac_client_add_user(guac_client* client, guac_user* user, int argc, char** 
 
     }
 
-    pthread_rwlock_unlock(&(client->__users_lock));
+    guac_release_lock(
+            &(client->__users_lock), client->__users_lock_key);
 
     /* Notify owner of user joining connection. */
     if (retval == 0 && !user->owner)
@@ -317,7 +324,8 @@ int guac_client_add_user(guac_client* client, guac_user* user, int argc, char** 
 
 void guac_client_remove_user(guac_client* client, guac_user* user) {
 
-    pthread_rwlock_wrlock(&(client->__users_lock));
+    guac_acquire_write_lock_if_needed(
+            &(client->__users_lock), client->__users_lock_key);
 
     /* Update prev / head */
     if (user->__prev != NULL)
@@ -335,7 +343,8 @@ void guac_client_remove_user(guac_client* client, guac_user* user) {
     if (user->owner)
         client->__owner = NULL;
 
-    pthread_rwlock_unlock(&(client->__users_lock));
+    guac_release_lock(
+            &(client->__users_lock), client->__users_lock_key);
 
     /* Update owner of user having left the connection. */
     if (!user->owner)
@@ -353,7 +362,8 @@ void guac_client_foreach_user(guac_client* client, guac_user_callback* callback,
 
     guac_user* current;
 
-    pthread_rwlock_rdlock(&(client->__users_lock));
+    guac_acquire_read_lock_if_needed(
+            &(client->__users_lock), client->__users_lock_key);
 
     /* Call function on each user */
     current = client->__users;
@@ -362,7 +372,8 @@ void guac_client_foreach_user(guac_client* client, guac_user_callback* callback,
         current = current->__next;
     }
 
-    pthread_rwlock_unlock(&(client->__users_lock));
+    guac_release_lock(
+            &(client->__users_lock), client->__users_lock_key);
 
 }
 
@@ -371,12 +382,14 @@ void* guac_client_for_owner(guac_client* client, guac_user_callback* callback,
 
     void* retval;
 
-    pthread_rwlock_rdlock(&(client->__users_lock));
+    guac_acquire_read_lock_if_needed(
+            &(client->__users_lock), client->__users_lock_key);
 
     /* Invoke callback with current owner */
     retval = callback(client->__owner, data);
 
-    pthread_rwlock_unlock(&(client->__users_lock));
+    guac_release_lock(
+            &(client->__users_lock), client->__users_lock_key);
 
     /* Return value from callback */
     return retval;
@@ -391,7 +404,8 @@ void* guac_client_for_user(guac_client* client, guac_user* user,
     int user_valid = 0;
     void* retval;
 
-    pthread_rwlock_rdlock(&(client->__users_lock));
+    guac_acquire_read_lock_if_needed(
+            &(client->__users_lock), client->__users_lock_key);
 
     /* Loop through all users, searching for a pointer to the given user */
     current = client->__users;
@@ -413,7 +427,8 @@ void* guac_client_for_user(guac_client* client, guac_user* user,
     /* Invoke callback with requested user (if they exist) */
     retval = callback(user, data);
 
-    pthread_rwlock_unlock(&(client->__users_lock));
+    guac_release_lock(
+            &(client->__users_lock), client->__users_lock_key);
 
     /* Return value from callback */
     return retval;
