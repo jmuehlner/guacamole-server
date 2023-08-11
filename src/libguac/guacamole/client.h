@@ -41,7 +41,9 @@
 #include <cairo/cairo.h>
 
 #include <pthread.h>
+#include <signal.h>
 #include <stdarg.h>
+#include <time.h>
 
 struct guac_client {
 
@@ -180,6 +182,38 @@ struct guac_client {
      * users are currently connected.
      */
     guac_user* __users;
+
+    /**
+     * Lock which is acquired when the pending users list is being manipulated,
+     * or when the pending users list is being iterated.
+     */
+    pthread_rwlock_t __pending_users_lock;
+
+    /**
+     * A timer that will periodically synchronize the list of pending users,
+     * emptying the list once synchronization is complete. Only for internal
+     * use within the client.
+     */
+    timer_t __pending_users_timer;
+
+    /**
+     * Notification / signaling configuration for the pending users timer.
+     * Only for internal use within the client.
+     */
+    struct sigevent __pending_users_timer_signal_config;
+
+    /**
+     * Specification for the timing of the pending users timer. Only for
+     * internal use within the client.
+     */
+    struct itimerspec __pending_users_time_spec;
+
+    /**
+     * The first user within the list of connected users who have not yet had
+     * their connection states synchronized after joining, or NULL if there are
+     * no such users.
+     */
+    guac_user* __pending_users;
 
     /**
      * The user that first created this connection. This user will also have

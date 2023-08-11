@@ -165,6 +165,20 @@ struct guac_user {
     guac_user* __next;
 
     /**
+     * The previous user in the group of users within a logical who have yet
+     * to have their connection state synchronized after joining. This field
+     * is only used internally by guac_client.
+     */
+    guac_user* __pending_prev;
+
+    /**
+     * The next user in the group of users within a logical who have yet to
+     * have their connection state synchronized after joining. This field
+     * is only used internally by guac_client.
+     */
+    guac_user* __pending_next;
+
+    /**
      * The time (in milliseconds) of receipt of the last sync message from
      * the user.
      */
