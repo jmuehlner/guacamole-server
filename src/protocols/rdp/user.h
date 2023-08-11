@@ -28,6 +28,11 @@
 guac_user_join_handler guac_rdp_user_join_handler;
 
 /**
+ * Handler for synchronizing recently joined users.
+ */
+guac_user_join_sync_handler guac_rdp_user_join_sync_handler;
+
+/**
  * Handler for leaving users.
  */
 guac_user_leave_handler guac_rdp_user_leave_handler;

@@ -207,6 +207,22 @@ struct guac_client {
     guac_user_join_handler* join_handler;
 
     /**
+     * Handler for synchronizing connection state to newly joined users. This
+     * handler will be periodically invoked for any users who have recently
+     * joined a connection, and have yet to have this handler invoked for them.
+     *
+     * Example:
+     * @code
+     *     void join_sync_handler(guac_user* user);
+     *
+     *     int guac_client_init(guac_client* client) {
+     *         client->join_sync_handler = join_sync_handler;
+     *     }
+     * @endcode
+     */
+    guac_user_join_sync_handler* join_sync_handler;
+
+    /**
      * Handler for leave events, called whenever a new user is leaving an
      * active connection.
      *

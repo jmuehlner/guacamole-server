@@ -71,13 +71,6 @@ int guac_kubernetes_user_join_handler(guac_user* user, int argc, char** argv) {
 
     }
 
-    /* If not owner, synchronize with current display */
-    else {
-        guac_terminal_dup(kubernetes_client->term, user, user->socket);
-        guac_kubernetes_send_current_argv(user, kubernetes_client);
-        guac_socket_flush(user->socket);
-    }
-
     /* Only handle events if not read-only */
     if (!settings->read_only) {
 
@@ -101,6 +94,18 @@ int guac_kubernetes_user_join_handler(guac_user* user, int argc, char** argv) {
     }
 
     return 0;
+
+}
+
+void guac_kubernetes_user_sync_handler(guac_user* user) {
+
+    guac_client* client = user->client;
+    guac_kubernetes_client* kubernetes_client =
+        (guac_kubernetes_client*) client->data;
+
+    guac_terminal_dup(kubernetes_client->term, user, user->socket);
+    guac_kubernetes_send_current_argv(user, kubernetes_client);
+    guac_socket_flush(user->socket);
 
 }
 

@@ -59,6 +59,7 @@ int guac_client_init(guac_client* client) {
 
     /* Set handlers */
     client->join_handler = guac_vnc_user_join_handler;
+    client->join_sync_handler = guac_vnc_user_join_sync_handler;
     client->leave_handler = guac_vnc_user_leave_handler;
     client->free_handler = guac_vnc_client_free_handler;
 

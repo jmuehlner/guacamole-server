@@ -73,13 +73,6 @@ int guac_ssh_user_join_handler(guac_user* user, int argc, char** argv) {
 
     }
 
-    /* If not owner, synchronize with current display */
-    else {
-        guac_terminal_dup(ssh_client->term, user, user->socket);
-        guac_ssh_send_current_argv(user, ssh_client);
-        guac_socket_flush(user->socket);
-    }
-
     /* Only handle events if not read-only */
     if (!settings->read_only) {
 
@@ -107,6 +100,17 @@ int guac_ssh_user_join_handler(guac_user* user, int argc, char** argv) {
     }
 
     return 0;
+
+}
+
+void guac_ssh_user_join_sync_handler(guac_user* user) {
+
+    guac_client* client = user->client;
+    guac_ssh_client* ssh_client = (guac_ssh_client*) client->data;
+
+    guac_terminal_dup(ssh_client->term, user, user->socket);
+    guac_ssh_send_current_argv(user, ssh_client);
+    guac_socket_flush(user->socket);
 
 }
 
