@@ -192,19 +192,27 @@ struct guac_client {
     /**
      * A timer that will periodically synchronize the list of pending users,
      * emptying the list once synchronization is complete. Only for internal
-     * use within the client.
+     * use within the client. This will be NULL until the first user joins
+     * the connection, as it is lazily instantiated at that time.
      */
     timer_t __pending_users_timer;
 
     /**
+     * A mutex that must be acquired before modifying the pending users timer.
+     */
+    pthread_mutex_t __pending_users_timer_mutex;
+
+    /**
      * Notification / signaling configuration for the pending users timer.
-     * Only for internal use within the client.
+     * Only for internal use within the client. This will be NULL until the
+     * first user joins the connection.
      */
     struct sigevent __pending_users_timer_signal_config;
 
     /**
      * Specification for the timing of the pending users timer. Only for
-     * internal use within the client.
+     * internal use within the client. This will be NULL until the
+     * first user joins the connection.
      */
     struct itimerspec __pending_users_time_spec;
 

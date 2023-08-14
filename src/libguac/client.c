@@ -37,6 +37,7 @@
 #include "local-lock.h"
 
 #include <dlfcn.h>
+#include <errno.h>
 #include <inttypes.h>
 #include <pthread.h>
 #include <signal.h>
@@ -203,21 +204,6 @@ guac_client* guac_client_alloc() {
         return NULL;
     }
 
-    /* Configure the timer to synchronize and clear the pending users */
-    client->__pending_users_timer_signal_config.sigev_notify = SIGEV_THREAD;
-    client->__pending_users_timer_signal_config.sigev_notify_function = (
-            guac_client_synchronize_pending_users);
-    client->__pending_users_timer_signal_config.sigev_value.sival_ptr = client;
-
-    /* Create a timer to synchronize any pending users periodically */
-    if (timer_create(
-            CLOCK_MONOTONIC,
-            &(client->__pending_users_timer_signal_config),
-            &(client->__pending_users_timer)) < 0) {
-        free(client);
-        return NULL;
-    }
-
     /* Allocate buffer and layer pools */
     client->__buffer_pool = guac_pool_alloc(GUAC_BUFFER_POOL_INITIAL_SIZE);
     client->__layer_pool = guac_pool_alloc(GUAC_BUFFER_POOL_INITIAL_SIZE);
@@ -238,6 +224,7 @@ guac_client* guac_client_alloc() {
     pthread_rwlockattr_setpshared(&lock_attributes, PTHREAD_PROCESS_SHARED);
 
     pthread_rwlock_init(&(client->__users_lock), &lock_attributes);
+    pthread_mutex_init(&(client->__pending_users_timer_mutex), NULL);
 
     /* Initialize the write-lock flag to 0, as threads won't have it yet */
     pthread_key_create(&(client->__users_lock_key), (void *) 0);
@@ -246,19 +233,6 @@ guac_client* guac_client_alloc() {
 
     /* Set up socket to broadcast to all users */
     client->socket = guac_socket_broadcast(client);
-
-    /* Configure the pending users timer to run on the defined interval */
-    client->__pending_users_time_spec.it_interval.tv_nsec = (
-            GUAC_CLIENT_PENDING_USERS_REFRESH_INTERVAL);
-    client->__pending_users_time_spec.it_value.tv_nsec = (
-            GUAC_CLIENT_PENDING_USERS_REFRESH_INTERVAL);
-
-    if (timer_settime(
-            client->__pending_users_timer, 0,
-            &(client->__pending_users_time_spec), NULL) < 0) {
-        guac_client_free(client);
-        return NULL;
-    }
 
     return client;
 
@@ -297,7 +271,9 @@ void guac_client_free(guac_client* client) {
     }
 
     /* Destroy the pending users timer */
-    timer_delete(client->__pending_users_timer);
+    pthread_mutex_destroy(&(client->__pending_users_timer_mutex));
+    if (client->__pending_users_timer != NULL)
+        timer_delete(client->__pending_users_timer);
 
     pthread_rwlock_destroy(&(client->__users_lock));
     pthread_key_delete(client->__users_lock_key);
@@ -396,7 +372,76 @@ static void guac_client_add_pending_user(
 
 }
 
+/**
+ * Creates and starts a new timer for the given guac client that will
+ * periodically synchronize new users. Returns zero if the timer is already
+ * running, or successfully created, or a non-zero value if the timer could not
+ * be created and started.
+ *
+ * @param client
+ *     The guac client for which the new timer should be started, if not
+ *     already running.
+ *
+ * @return
+ *     Zero if the timer was successfully created and started, or a negative
+ *     value otherwise.
+ */
+static int guac_client_start_pending_users_timer(guac_client* client) {
+
+    pthread_mutex_lock(&(client->__pending_users_timer_mutex));
+
+    /* Return success if the timer is already created and running */
+    if (client->__pending_users_timer != NULL)
+        return 0;
+
+    /* Configure the timer to synchronize and clear the pending users */
+    client->__pending_users_timer_signal_config.sigev_notify = SIGEV_THREAD;
+    client->__pending_users_timer_signal_config.sigev_notify_function = (
+            guac_client_synchronize_pending_users);
+    client->__pending_users_timer_signal_config.sigev_value.sival_ptr = client;
+
+    /* Create a timer to synchronize any pending users periodically */
+    if (timer_create(
+            CLOCK_MONOTONIC,
+            &(client->__pending_users_timer_signal_config),
+            &(client->__pending_users_timer))) {
+        pthread_mutex_unlock(&(client->__pending_users_timer_mutex));
+        return 1;
+    }
+
+    client->__pending_users_time_spec.it_interval.tv_nsec = (
+            GUAC_CLIENT_PENDING_USERS_REFRESH_INTERVAL);
+    client->__pending_users_time_spec.it_value.tv_nsec = (
+            GUAC_CLIENT_PENDING_USERS_REFRESH_INTERVAL);
+
+    /* Configure the pending users timer to run on the defined interval */
+    if (timer_settime(
+            client->__pending_users_timer, 0,
+            &(client->__pending_users_time_spec), NULL) < 0) {
+        timer_delete(client->__pending_users_timer);
+        client->__pending_users_timer = NULL;
+        pthread_mutex_unlock(&(client->__pending_users_timer_mutex));
+        return 1;
+    }
+
+
+    return 0;
+
+}
+
 int guac_client_add_user(guac_client* client, guac_user* user, int argc, char** argv) {
+
+    /* Create and start the timer if it hasn't already been initialized */
+    if(guac_client_start_pending_users_timer(client)) {
+
+        /**
+         * If the timer could not be created, do not add the user - they cannot
+         * be synchronized without the timer.
+         */
+        guac_client_log(client, GUAC_LOG_ERROR,
+                "Could not start pending user timer: %s.", strerror(errno));
+        return 1;
+    }
 
     int retval = 0;
 
