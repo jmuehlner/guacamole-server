@@ -411,14 +411,6 @@ typedef int guac_user_end_handler(guac_user* user, guac_stream* stream);
 typedef int guac_user_join_handler(guac_user* user, int argc, char** argv);
 
 /**
- * Handler for synchronizing connection state to recently joined users.
- *
- * @param user
- *     The user who recently joined the connection.
- */
-typedef void guac_user_join_sync_handler(guac_user* user);
-
-/**
  * Handler for Guacamole leave events. A leave event is fired by the
  * guac_client whenever a guac_user leaves the connection. There is no
  * instruction associated with a leave event.

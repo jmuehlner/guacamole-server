@@ -103,17 +103,6 @@ int guac_ssh_user_join_handler(guac_user* user, int argc, char** argv) {
 
 }
 
-void guac_ssh_user_join_sync_handler(guac_user* user) {
-
-    guac_client* client = user->client;
-    guac_ssh_client* ssh_client = (guac_ssh_client*) client->data;
-
-    guac_terminal_dup(ssh_client->term, user, user->socket);
-    guac_ssh_send_current_argv(user, ssh_client);
-    guac_socket_flush(user->socket);
-
-}
-
 int guac_ssh_user_leave_handler(guac_user* user) {
 
     guac_ssh_client* ssh_client = (guac_ssh_client*) user->client->data;

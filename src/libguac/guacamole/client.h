@@ -190,6 +190,13 @@ struct guac_client {
     pthread_rwlock_t __pending_users_lock;
 
     /**
+     * A key to access a thread-local property tracking whether the current
+     * thread currently has the write lock acquired for __pending_users_lock.
+     * This has the same semantics as __users_lock_key.
+     */
+    pthread_key_t  __pending_users_lock_key;
+
+    /**
      * A timer that will periodically synchronize the list of pending users,
      * emptying the list once synchronization is complete. Only for internal
      * use within the client. This will be NULL until the first user joins
@@ -218,8 +225,7 @@ struct guac_client {
 
     /**
      * The first user within the list of connected users who have not yet had
-     * their connection states synchronized after joining, or NULL if there are
-     * no such users.
+     * their connection states synchronized after joining.
      */
     guac_user* __pending_users;
 
@@ -260,20 +266,20 @@ struct guac_client {
     guac_user_join_handler* join_handler;
 
     /**
-     * Handler for synchronizing connection state to newly joined users. This
-     * handler will be periodically invoked for any users who have recently
-     * joined a connection, and have yet to have this handler invoked for them.
+     * A handler that will be run prior to pending users being promoted to full
+     * users. Any required pending user operations should be applied
+     * guac_client_foreach_pending_user().
      *
      * Example:
      * @code
-     *     void join_sync_handler(guac_user* user);
+     *     void join_pending_handler(guac_client* client);
      *
      *     int guac_client_init(guac_client* client) {
-     *         client->join_sync_handler = join_sync_handler;
+     *         client->join_pending_handler = join_pending_handler;
      *     }
      * @endcode
      */
-    guac_user_join_sync_handler* join_sync_handler;
+    guac_join_pending_handler* join_pending_handler;
 
     /**
      * Handler for leave events, called whenever a new user is leaving an
@@ -513,6 +519,26 @@ void guac_client_remove_user(guac_client* client, guac_user* user);
  *     Arbitrary data to pass to the callback each time it is invoked.
  */
 void guac_client_foreach_user(guac_client* client,
+        guac_user_callback* callback, void* data);
+
+/**
+ * Calls the given function on all pending users of the given client. The
+ * function will be given a reference to a guac_user and the specified
+ * arbitrary data. The value returned by the callback will be ignored.
+ *
+ * This function is reentrant, but the pending user list MUST NOT be manipulated
+ * within the same thread as a callback to this function.
+ *
+ * @param client
+ *     The client whose users should be iterated.
+ *
+ * @param callback
+ *     The function to call for each pending user.
+ *
+ * @param data
+ *     Arbitrary data to pass to the callback each time it is invoked.
+ */
+void guac_client_foreach_pending_user(guac_client* client,
         guac_user_callback* callback, void* data);
 
 /**

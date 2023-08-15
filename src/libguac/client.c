@@ -155,7 +155,8 @@ static void guac_client_synchronize_pending_users(union sigval data) {
     for(user = client->__pending_users; user != NULL; user = user->__pending_next) {
 
         /* Synchronize the connection state for this user */
-        client->join_sync_handler(user);
+        if (client->join_pending_handler)
+            client->join_pending_handler(client);
 
         /* Remove the user from the list */
         if (user->__pending_prev != NULL) {
@@ -222,14 +223,14 @@ guac_client* guac_client_alloc() {
     /* Init locks */
     pthread_rwlockattr_init(&lock_attributes);
     pthread_rwlockattr_setpshared(&lock_attributes, PTHREAD_PROCESS_SHARED);
-
     pthread_rwlock_init(&(client->__users_lock), &lock_attributes);
-    pthread_mutex_init(&(client->__pending_users_timer_mutex), NULL);
-
-    /* Initialize the write-lock flag to 0, as threads won't have it yet */
-    pthread_key_create(&(client->__users_lock_key), (void *) 0);
 
     pthread_rwlock_init(&(client->__pending_users_lock), NULL);
+    pthread_mutex_init(&(client->__pending_users_timer_mutex), NULL);
+
+    /* Initialize the write lock flags to 0, as threads won't have yet */
+    pthread_key_create(&(client->__users_lock_key), (void *) 0);
+    pthread_key_create(&(client->__pending_users_lock_key), (void *) 0);
 
     /* Set up socket to broadcast to all users */
     client->socket = guac_socket_broadcast(client);
@@ -279,6 +280,7 @@ void guac_client_free(guac_client* client) {
     pthread_key_delete(client->__users_lock_key);
 
     pthread_rwlock_destroy(&(client->__pending_users_lock));
+    pthread_key_delete(client->__pending_users_lock_key);
 
     free(client->connection_id);
     free(client);
@@ -373,10 +375,9 @@ static void guac_client_add_pending_user(
 }
 
 /**
- * Creates and starts a new timer for the given guac client that will
- * periodically synchronize new users. Returns zero if the timer is already
- * running, or successfully created, or a non-zero value if the timer could not
- * be created and started.
+ * Perioidcally promote pending users to full users. Returns zero if the timer
+ * is already running, or successfully created, or a non-zero value if the
+ * timer could not be created and started.
  *
  * @param client
  *     The guac client for which the new timer should be started, if not
@@ -445,30 +446,13 @@ int guac_client_add_user(guac_client* client, guac_user* user, int argc, char** 
 
     int retval = 0;
 
-    /* Call handler, if defined */
-    if (client->join_handler)
-        retval = client->join_handler(user, argc, argv);
-
+    /* Block the user list / broadcast socket while the join handler runs */
     guac_acquire_write_lock_if_needed(
             &(client->__users_lock), client->__users_lock_key);
 
-    /* Add to list if join was successful */
-    if (retval == 0) {
-
-        user->__prev = NULL;
-        user->__next = client->__users;
-
-        if (client->__users != NULL)
-            client->__users->__prev = user;
-
-        client->__users = user;
-        client->connected_users++;
-
-        /* Update owner pointer if user is owner */
-        if (user->owner)
-            client->__owner = user;
-
-    }
+    /* Call handler, if defined */
+    if (client->join_handler)
+        retval = client->join_handler(user, argc, argv);
 
     guac_release_lock(
             &(client->__users_lock), client->__users_lock_key);
@@ -558,6 +542,26 @@ void guac_client_foreach_user(guac_client* client, guac_user_callback* callback,
 
     guac_release_lock(
             &(client->__users_lock), client->__users_lock_key);
+
+}
+
+void guac_client_foreach_pending_user(
+        guac_client* client, guac_user_callback* callback, void* data) {
+
+    guac_user* current;
+
+    guac_acquire_read_lock_if_needed(
+            &(client->__pending_users_lock), client->__pending_users_lock_key);
+
+    /* Call function on each user */
+    current = client->__pending_users;
+    while (current != NULL) {
+        callback(current, data);
+        current = current->__pending_next;
+    }
+
+    guac_release_lock(
+            &(client->__pending_users_lock), client->__pending_users_lock_key);
 
 }
 

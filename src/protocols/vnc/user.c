@@ -116,22 +116,6 @@ int guac_vnc_user_join_handler(guac_user* user, int argc, char** argv) {
 
 }
 
-void guac_vnc_user_sync_handler(guac_user* user) {
-
-    guac_vnc_client* vnc_client = (guac_vnc_client*) user->client->data;
-
-#ifdef ENABLE_PULSE
-    /* Synchronize an audio stream */
-    if (vnc_client->audio)
-        guac_pa_stream_add_user(vnc_client->audio, user);
-#endif
-
-    /* Synchronize with current display */
-    guac_common_display_dup(vnc_client->display, user, user->socket);
-    guac_socket_flush(user->socket);
-
-}
-
 int guac_vnc_user_leave_handler(guac_user* user) {
 
     guac_vnc_client* vnc_client = (guac_vnc_client*) user->client->data;
