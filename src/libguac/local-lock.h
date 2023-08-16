@@ -23,6 +23,22 @@
 #include <pthread.h>
 
 /**
+ * This file implements reentrant read-write locks using thread-local storage
+ * to keep track of how locks are held and released by the current thread,
+ * since the pthread locks do not support reentrant behavior.
+ *
+ * A thread will attempt to acquire the requested lock on the first acquire
+ * function call, and will release it once the number of unlock requests
+ * matches the number of lock requests. Therefore, it is safe to aquire a lock
+ * and then call a function that also acquires the same lock, provided that
+ * the caller and the callee request to unlock the lock when done with it.
+ *
+ * Any lock that's locked using one of the functions defined in this file
+ * must _only_ be unlocked using the unlock function defined here to avoid
+ * unexpected behavior.
+ */
+
+/**
  * Aquire the write lock for the provided read-write lock, if the provided key
  * does not indicate that the write-lock is already acquired. If the key
  * indicates that the read lock is already aquired, the read lock will be
@@ -53,8 +69,9 @@ void guac_acquire_write_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key
 void guac_acquire_read_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key);
 
 /**
- * Release the the provided read-write lock, setting the provided key to
- * indicate that the lock has been released.
+ * Release the the provided read-write lock if this is the last level of the
+ * lock held by this thread. Otherwise, the current level of the reentrant
+ * lock will be marked as complete.
  *
  * @param lock
  *     The read-write lock that should be released.
@@ -63,7 +80,7 @@ void guac_acquire_read_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key)
  *     The key associated with the thread-local flag indicating which locks
  *     are already acquired by the current thread.
  */
-void guac_release_lock(pthread_rwlock_t* lock, pthread_key_t key);
+void guac_release_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key);
 
 #endif
 

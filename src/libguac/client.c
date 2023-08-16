@@ -146,8 +146,6 @@ void guac_client_free_stream(guac_client* client, guac_stream* stream) {
  */
 static void guac_client_synchronize_pending_users(union sigval data) {
 
-    fprintf(stderr, "I am running the sync\n");
-
     guac_client* client = (guac_client*) data.sival_ptr;
 
     /* Acquire the lock for reading and modifying the list of pending users */
@@ -190,7 +188,7 @@ static void guac_client_synchronize_pending_users(union sigval data) {
     client->__pending_users = NULL;
 
     /* Release the lock */
-    guac_release_lock(
+    guac_release_lock_if_needed(
             &(client->__pending_users_lock), client->__pending_users_lock_key);
 
     /* If any users were removed from the pending list, promote them now */
@@ -205,12 +203,10 @@ static void guac_client_synchronize_pending_users(union sigval data) {
 
         client->connected_users += users_promoted;
 
-        guac_release_lock(
+        guac_release_lock_if_needed(
                 &(client->__users_lock), client->__users_lock_key);
 
     }
-
-
 
 }
 
@@ -498,7 +494,7 @@ int guac_client_add_user(guac_client* client, guac_user* user, int argc, char** 
     if (client->join_handler)
         retval = client->join_handler(user, argc, argv);
 
-    guac_release_lock(
+    guac_release_lock_if_needed(
             &(client->__users_lock), client->__users_lock_key);
 
     if (retval == 0) {
@@ -524,6 +520,8 @@ int guac_client_add_user(guac_client* client, guac_user* user, int argc, char** 
 }
 
 void guac_client_remove_user(guac_client* client, guac_user* user) {
+
+    fprintf(stderr, "I am removing %p\n", (void*) user);
 
     guac_acquire_write_lock_if_needed(
             &(client->__users_lock), client->__users_lock_key);
@@ -552,10 +550,13 @@ void guac_client_remove_user(guac_client* client, guac_user* user) {
 
     }
 
-    guac_release_lock(
+    guac_release_lock_if_needed(
             &(client->__users_lock), client->__users_lock_key);
 
-    pthread_rwlock_wrlock(&(client->__pending_users_lock));
+    fprintf(stderr, "I am to be in the second thing with %p\n", (void*) user);
+
+    guac_acquire_write_lock_if_needed(
+            &(client->__pending_users_lock), client->__pending_users_lock_key);
 
     /* Next, remove the user from the pending list, if present */
     if (
@@ -580,7 +581,8 @@ void guac_client_remove_user(guac_client* client, guac_user* user) {
 
     }
 
-    pthread_rwlock_unlock(&(client->__pending_users_lock));
+    guac_release_lock_if_needed(
+            &(client->__pending_users_lock), client->__pending_users_lock_key);
 
     /* Update owner of user having left the connection. */
     if (!user->owner)
@@ -591,6 +593,8 @@ void guac_client_remove_user(guac_client* client, guac_user* user) {
         user->leave_handler(user);
     else if (client->leave_handler)
         client->leave_handler(user);
+
+    fprintf(stderr, "Now there are %i users total\n", client->connected_users + client->pending_users);
 
 }
 
@@ -608,7 +612,7 @@ void guac_client_foreach_user(guac_client* client, guac_user_callback* callback,
         current = current->__next;
     }
 
-    guac_release_lock(
+    guac_release_lock_if_needed(
             &(client->__users_lock), client->__users_lock_key);
 
 }
@@ -628,7 +632,7 @@ void guac_client_foreach_pending_user(
         current = current->__pending_next;
     }
 
-    guac_release_lock(
+    guac_release_lock_if_needed(
             &(client->__pending_users_lock), client->__pending_users_lock_key);
 
 }
@@ -644,7 +648,7 @@ void* guac_client_for_owner(guac_client* client, guac_user_callback* callback,
     /* Invoke callback with current owner */
     retval = callback(client->__owner, data);
 
-    guac_release_lock(
+    guac_release_lock_if_needed(
             &(client->__users_lock), client->__users_lock_key);
 
     /* Return value from callback */
@@ -683,7 +687,7 @@ void* guac_client_for_user(guac_client* client, guac_user* user,
     /* Invoke callback with requested user (if they exist) */
     retval = callback(user, data);
 
-    guac_release_lock(
+    guac_release_lock_if_needed(
             &(client->__users_lock), client->__users_lock_key);
 
     /* Return value from callback */

@@ -167,13 +167,8 @@ struct guac_client {
     pthread_rwlock_t __users_lock;
 
     /**
-     * A key to access a thread-local property tracking whether the current
-     * thread currently has the write lock acquired for __users_lock. This
-     * property will be set to a non-zero value if the thread curently has
-     * the write lock, or 0 otherwise. If a thread reads a non-zero value
-     * indicating that it already has the write lock, it should not attempt
-     * to reaquire the lock (read or write), as this will result in undefined
-     * behavior.
+     * A key to access a thread-local property tracking any ownership of the
+     * users lock by the current thread. Internal use only.
      */
     pthread_key_t  __users_lock_key;
 
@@ -190,9 +185,8 @@ struct guac_client {
     pthread_rwlock_t __pending_users_lock;
 
     /**
-     * A key to access a thread-local property tracking whether the current
-     * thread currently has the write lock acquired for __pending_users_lock.
-     * This has the same semantics as __users_lock_key.
+     * A key to access a thread-local property tracking any ownership of the
+     * pending users lock by the current thread. Internal use only.
      */
     pthread_key_t  __pending_users_lock_key;
 
