@@ -138,29 +138,45 @@ void guac_client_free_stream(guac_client* client, guac_stream* stream) {
 }
 
 /**
- * Syncronize and clear the pending users list for the
+ * Promote all pending users to full users, calling the join pending handler
+ * before, if any.
  *
  * @param data
- *     The client for which the pending user list should be synchronized.
+ *     The client for which all pending users should be promoted.
  */
 static void guac_client_synchronize_pending_users(union sigval data) {
+
+    fprintf(stderr, "I am running the sync\n");
 
     guac_client* client = (guac_client*) data.sival_ptr;
 
     /* Acquire the lock for reading and modifying the list of pending users */
-    pthread_rwlock_wrlock(&(client->__pending_users_lock));
+    guac_acquire_write_lock_if_needed(
+            &(client->__pending_users_lock), client->__pending_users_lock_key);
 
-    /* Synchronize all pending users, in FIFO order */
+    /* The number of users being promoted from pending */
+    int users_promoted = 0;
+
+    /* Synchronize the connection state for all pending users */
+    if (client->join_pending_handler)
+        client->join_pending_handler(client);
+
     guac_user* user;
     for(user = client->__pending_users; user != NULL; user = user->__pending_next) {
 
-        /* Synchronize the connection state for this user */
-        if (client->join_pending_handler)
-            client->join_pending_handler(client);
+        fprintf(stderr, "I am promoting %p\n", (void*) user);
 
-        /* Remove the user from the list */
+        users_promoted++;
+
+        /* Convert the pending links to full links to promote the users */
         if (user->__pending_prev != NULL) {
+
+            /* Set the next pointer to point to this user */
             user->__pending_prev->__pending_next = NULL;
+            user->__pending_prev->__next = user;
+
+            /* Set the prev link to point at the previous pending user */
+            user->__prev = user->__pending_prev;
             user->__pending_prev = NULL;
         }
 
@@ -174,7 +190,27 @@ static void guac_client_synchronize_pending_users(union sigval data) {
     client->__pending_users = NULL;
 
     /* Release the lock */
-    pthread_rwlock_unlock(&(client->__pending_users_lock));
+    guac_release_lock(
+            &(client->__pending_users_lock), client->__pending_users_lock_key);
+
+    /* If any users were removed from the pending list, promote them now */
+    if (user != NULL) {
+
+        guac_acquire_write_lock_if_needed(
+                &(client->__users_lock), client->__users_lock_key);
+
+        /* Add all formerly-pending users to the start of the user list */
+        user->__next = client->__users;
+        client->__users = user;
+
+        client->connected_users += users_promoted;
+
+        guac_release_lock(
+                &(client->__users_lock), client->__users_lock_key);
+
+    }
+
+
 
 }
 
@@ -240,6 +276,10 @@ guac_client* guac_client_alloc() {
 }
 
 void guac_client_free(guac_client* client) {
+
+    /* Remove all pending users */
+    while (client->__pending_users != NULL)
+        guac_client_remove_user(client, client->__pending_users);
 
     /* Remove all users */
     while (client->__users != NULL)
@@ -369,6 +409,11 @@ static void guac_client_add_pending_user(
 
     client->__pending_users = user;
 
+    fprintf(stderr, "I added user %p to pending\n", (void*) user);
+
+    /* Increment the pending user count */
+    client->pending_users++;
+
     /* Release the lock */
     pthread_rwlock_unlock(&(client->__pending_users_lock));
 
@@ -425,7 +470,6 @@ static int guac_client_start_pending_users_timer(guac_client* client) {
         return 1;
     }
 
-
     return 0;
 
 }
@@ -457,13 +501,19 @@ int guac_client_add_user(guac_client* client, guac_user* user, int argc, char** 
     guac_release_lock(
             &(client->__users_lock), client->__users_lock_key);
 
-    if (retval == 0)
+    if (retval == 0) {
 
         /*
         * Add the user to the list of pending users, to have their connection
         * state synchronized asynchronously.
         */
         guac_client_add_pending_user(client, user);
+
+        /* Update owner pointer if user is owner */
+        if (user->owner)
+            client->__owner = user;
+
+    }
 
     /* Notify owner of user joining connection. */
     if (retval == 0 && !user->owner)
@@ -475,43 +525,61 @@ int guac_client_add_user(guac_client* client, guac_user* user, int argc, char** 
 
 void guac_client_remove_user(guac_client* client, guac_user* user) {
 
-    /* First, modify the list of connected users */
     guac_acquire_write_lock_if_needed(
             &(client->__users_lock), client->__users_lock_key);
 
-    /* Update prev / head */
-    if (user->__prev != NULL)
-        user->__prev->__next = user->__next;
-    else
-        client->__users = user->__next;
+    /* First, remove from the list of users if present (not pending) */
+    if (
+            user->__next != NULL ||
+            user->__prev != NULL ||
+            client->__users == user) {
 
-    /* Update next */
-    if (user->__next != NULL)
-        user->__next->__prev = user->__prev;
+        /* Update prev / head */
+        if (user->__prev != NULL)
+            user->__prev->__next = user->__next;
+        else
+            client->__users = user->__next;
 
-    client->connected_users--;
+        /* Update next */
+        if (user->__next != NULL)
+            user->__next->__prev = user->__prev;
 
-    /* Update owner pointer if user was owner */
-    if (user->owner)
-        client->__owner = NULL;
+        client->connected_users--;
+
+        /* Update owner pointer if user was owner */
+        if (user->owner)
+            client->__owner = NULL;
+
+    }
 
     guac_release_lock(
             &(client->__users_lock), client->__users_lock_key);
 
-    /* Next, remove the user from the pending list, if present */
     pthread_rwlock_wrlock(&(client->__pending_users_lock));
 
-    /* Update prev / head */
-    if (user->__pending_prev != NULL)
-        user->__pending_prev->__pending_next = user->__pending_next;
-    else
-        client->__pending_users = user->__pending_next;
+    /* Next, remove the user from the pending list, if present */
+    if (
+            user->__pending_next != NULL ||
+            user->__pending_prev != NULL ||
+            client->__pending_users == user) {
 
-    /* Update next */
-    if (user->__pending_next != NULL)
-        user->__pending_next->__pending_prev = user->__pending_prev;
+        if (user->__pending_prev != NULL)
+            user->__pending_prev->__pending_next = user->__pending_next;
+        else
+            client->__pending_users = user->__pending_next;
 
-    /* Release the lock */
+        /* Update next */
+        if (user->__pending_next != NULL)
+            user->__pending_next->__pending_prev = user->__pending_prev;
+
+        client->pending_users--;
+
+        /* Update owner pointer if user was owner */
+        if (user->owner)
+            client->__owner = NULL;
+
+    }
+
     pthread_rwlock_unlock(&(client->__pending_users_lock));
 
     /* Update owner of user having left the connection. */

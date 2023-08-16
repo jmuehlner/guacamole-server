@@ -243,6 +243,12 @@ struct guac_client {
     int connected_users;
 
     /**
+     * The number of pending users, for whom the pending join handler has yet
+     * to be run.
+     */
+    int pending_users;
+
+    /**
      * Handler for join events, called whenever a new user is joining an active
      * connection. Note that because users may leave the connection at any
      * time, a reference to a guac_user can become invalid at any time and
