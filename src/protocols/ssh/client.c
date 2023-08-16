@@ -36,6 +36,9 @@
 #include <guacamole/recording.h>
 #include <guacamole/socket.h>
 
+// no
+#include <stdio.h>
+
 /**
  * Synchronize the connection state for the given pending user.
  *
@@ -50,12 +53,16 @@
  */
 static void* guac_ssh_sync_pending_user(guac_user* user, void* data) {
 
+    fprintf(stderr, "SSH syncing %p\n", (void*) user);
+
     guac_client* client = user->client;
     guac_ssh_client* ssh_client = (guac_ssh_client*) client->data;
 
     guac_terminal_dup(ssh_client->term, user, user->socket);
     guac_ssh_send_current_argv(user, ssh_client);
     guac_socket_flush(user->socket);
+
+    fprintf(stderr, "Done SSH syncing %p\n", (void*) user);
 
     return NULL;
 

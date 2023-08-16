@@ -20,6 +20,9 @@
 #include <pthread.h>
 #include "local-lock.h"
 
+// NO
+#include <stdio.h>
+
 /**
  * The value indicating that the current thread holds neither the read or write
  * locks.
@@ -100,6 +103,8 @@ void guac_acquire_write_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key
         pthread_setspecific(key, get_value_from_flag_and_count(
                 flag, count + 1));
 
+        fprintf(stderr, "Write locking %p at level %li (thread %lu)\n", (void*) lock, count+1, pthread_self());
+
         /* This thread already has the lock */
         return;
     }
@@ -111,8 +116,13 @@ void guac_acquire_write_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key
      * write lock by another function without the caller knowing about it. This
      * shouldn't cause any issues, however.
      */
-    if (key_value == GUAC_LOCAL_LOCK_READ_LOCK)
+    if (key_value == GUAC_LOCAL_LOCK_READ_LOCK) {
+
+        fprintf(stderr, "Promoting %p to write at level %li (thread %lu)\n", (void*) lock, count+1, pthread_self());
         pthread_rwlock_unlock(lock);
+    }
+
+    fprintf(stderr, "Now trying to get %p\n", (void*) lock);
 
     /* Acquire the write lock */
     pthread_rwlock_wrlock(lock);
@@ -120,6 +130,8 @@ void guac_acquire_write_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key
     /* Mark that the current thread has the lock, and increment the count */
     pthread_setspecific(key, get_value_from_flag_and_count(
             GUAC_LOCAL_LOCK_WRITE_LOCK, count + 1));
+
+    fprintf(stderr, "Write locking %p at level 1 (thread %lu)\n", (void*) lock, pthread_self());
 
 }
 
@@ -139,6 +151,8 @@ void guac_acquire_read_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key)
         pthread_setspecific(key, get_value_from_flag_and_count(
                 flag, count + 1));
 
+        fprintf(stderr, "Read locking %p at level %li (thread %lu)\n", (void*) lock, count+1, pthread_self());
+
         /* This thread already has the lock */
         return;
     }
@@ -150,6 +164,8 @@ void guac_acquire_read_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key)
     pthread_setspecific(key, get_value_from_flag_and_count(
                 GUAC_LOCAL_LOCK_READ_LOCK, 1));
 
+    fprintf(stderr, "Read locking %p at level 1 (thred %lu)\n", (void*) lock, pthread_self());
+
 }
 
 void guac_release_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key) {
@@ -160,15 +176,31 @@ void guac_release_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key) {
 
     /* Release the lock if this is the last locked level */
     if (count <= 1) {
-        pthread_rwlock_unlock(lock);
+
+        /*
+         * Only actually release the lock if it's still held. If a release
+         * request is made when the count is 0 or below, do not attempt to
+         * release a lock that the thread doesn't hold.
+         */
+        if (count == 1)
+            pthread_rwlock_unlock(lock);
+
+        else
+            fprintf(stderr, "OMFG WTF double release for %p?!? (thread %lu)\n", (void*) lock, pthread_self());
 
         /* Set the flag that the current thread holds no locks */
         pthread_setspecific(key, get_value_from_flag_and_count(
                 GUAC_LOCAL_LOCK_NO_LOCK, 0));
+
+        fprintf(stderr, "Releasing %p, count is %li (thread %lu)\n", (void*) lock, count, pthread_self());
+
+        return;
     }
 
     /* Do not release the lock since it's still in use - just decrement */
     pthread_setspecific(key, get_value_from_flag_and_count(
             flag, count - 1));
+
+    fprintf(stderr, "Decrementing %p, now at at level %li (thread %lu)\n", (void*) lock, count-1, pthread_self());
 
 }

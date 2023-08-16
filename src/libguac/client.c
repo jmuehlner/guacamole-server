@@ -144,9 +144,17 @@ void guac_client_free_stream(guac_client* client, guac_stream* stream) {
  * @param data
  *     The client for which all pending users should be promoted.
  */
-static void guac_client_synchronize_pending_users(union sigval data) {
+static void guac_client_promote_pending_users(union sigval data) {
 
     guac_client* client = (guac_client*) data.sival_ptr;
+
+    /*
+     * Acquire the lock for reading and modifying the list of users, and to
+     * block the broadcast socket to ensure that all updates from here one out
+     * will go to these newly promoted users
+     */
+    guac_acquire_write_lock_if_needed(
+            &(client->__users_lock), client->__users_lock_key);
 
     /* Acquire the lock for reading and modifying the list of pending users */
     guac_acquire_write_lock_if_needed(
@@ -158,6 +166,12 @@ static void guac_client_synchronize_pending_users(union sigval data) {
     /* Synchronize the connection state for all pending users */
     if (client->join_pending_handler)
         client->join_pending_handler(client);
+
+    /* The first pending user in the list, if any */
+    guac_user* first_user = client->__pending_users;
+
+    /* The final user in the list, if any */
+    guac_user* last_user = NULL;
 
     guac_user* user;
     for(user = client->__pending_users; user != NULL; user = user->__pending_next) {
@@ -178,35 +192,33 @@ static void guac_client_synchronize_pending_users(union sigval data) {
             user->__pending_prev = NULL;
         }
 
-    }
+        last_user = user;
 
-    /* Clean up the final user */
-    if (user != NULL)
-        user->__pending_next = NULL;
+    }
 
     /* Mark the list as empty */
     client->__pending_users = NULL;
+    client->pending_users = 0;
 
     /* Release the lock */
     guac_release_lock_if_needed(
             &(client->__pending_users_lock), client->__pending_users_lock_key);
 
     /* If any users were removed from the pending list, promote them now */
-    if (user != NULL) {
-
-        guac_acquire_write_lock_if_needed(
-                &(client->__users_lock), client->__users_lock_key);
+    if (last_user != NULL) {
 
         /* Add all formerly-pending users to the start of the user list */
-        user->__next = client->__users;
-        client->__users = user;
+        last_user->__next = client->__users;
+        client->__users = first_user;
 
         client->connected_users += users_promoted;
 
-        guac_release_lock_if_needed(
-                &(client->__users_lock), client->__users_lock_key);
-
     }
+
+    guac_release_lock_if_needed(
+            &(client->__users_lock), client->__users_lock_key);
+
+    fprintf(stderr, "Done syncing\n");
 
 }
 
@@ -256,13 +268,14 @@ guac_client* guac_client_alloc() {
     pthread_rwlockattr_init(&lock_attributes);
     pthread_rwlockattr_setpshared(&lock_attributes, PTHREAD_PROCESS_SHARED);
     pthread_rwlock_init(&(client->__users_lock), &lock_attributes);
-
     pthread_rwlock_init(&(client->__pending_users_lock), NULL);
-    pthread_mutex_init(&(client->__pending_users_timer_mutex), NULL);
 
     /* Initialize the write lock flags to 0, as threads won't have yet */
     pthread_key_create(&(client->__users_lock_key), (void *) 0);
     pthread_key_create(&(client->__pending_users_lock_key), (void *) 0);
+
+    /* Ensure the timer is constructed only once */
+    pthread_mutex_init(&(client->__pending_users_timer_mutex), NULL);
 
     /* Set up socket to broadcast to all users */
     client->socket = guac_socket_broadcast(client);
@@ -395,7 +408,8 @@ static void guac_client_add_pending_user(
         guac_client* client, guac_user* user) {
 
     /* Acquire the lock for modifying the list of pending users */
-    pthread_rwlock_wrlock(&(client->__pending_users_lock));
+    guac_acquire_write_lock_if_needed(
+            &(client->__pending_users_lock), client->__pending_users_lock_key);
 
     user->__pending_prev = NULL;
     user->__pending_next = client->__pending_users;
@@ -411,12 +425,13 @@ static void guac_client_add_pending_user(
     client->pending_users++;
 
     /* Release the lock */
-    pthread_rwlock_unlock(&(client->__pending_users_lock));
+    guac_release_lock_if_needed(
+            &(client->__pending_users_lock), client->__pending_users_lock_key);
 
 }
 
 /**
- * Perioidcally promote pending users to full users. Returns zero if the timer
+ * Periodically promote pending users to full users. Returns zero if the timer
  * is already running, or successfully created, or a non-zero value if the
  * timer could not be created and started.
  *
@@ -439,7 +454,7 @@ static int guac_client_start_pending_users_timer(guac_client* client) {
     /* Configure the timer to synchronize and clear the pending users */
     client->__pending_users_timer_signal_config.sigev_notify = SIGEV_THREAD;
     client->__pending_users_timer_signal_config.sigev_notify_function = (
-            guac_client_synchronize_pending_users);
+            guac_client_promote_pending_users);
     client->__pending_users_timer_signal_config.sigev_value.sival_ptr = client;
 
     /* Create a timer to synchronize any pending users periodically */
@@ -521,7 +536,7 @@ int guac_client_add_user(guac_client* client, guac_user* user, int argc, char** 
 
 void guac_client_remove_user(guac_client* client, guac_user* user) {
 
-    fprintf(stderr, "I am removing %p\n", (void*) user);
+    fprintf(stderr, "I am removing %p - need %p\n", (void*) user, (void*) &(client->__users_lock));
 
     guac_acquire_write_lock_if_needed(
             &(client->__users_lock), client->__users_lock_key);
@@ -553,10 +568,12 @@ void guac_client_remove_user(guac_client* client, guac_user* user) {
     guac_release_lock_if_needed(
             &(client->__users_lock), client->__users_lock_key);
 
-    fprintf(stderr, "I am to be in the second thing with %p\n", (void*) user);
+    fprintf(stderr, "I am to be in %p with %p\n", (void*) &(client->__pending_users_lock), (void*) user);
 
     guac_acquire_write_lock_if_needed(
             &(client->__pending_users_lock), client->__pending_users_lock_key);
+
+    fprintf(stderr, "I am in %p with %p\n", (void*) &(client->__pending_users_lock), (void*) user);
 
     /* Next, remove the user from the pending list, if present */
     if (
@@ -625,7 +642,7 @@ void guac_client_foreach_pending_user(
     guac_acquire_read_lock_if_needed(
             &(client->__pending_users_lock), client->__pending_users_lock_key);
 
-    /* Call function on each user */
+    /* Call function on each pending user */
     current = client->__pending_users;
     while (current != NULL) {
         callback(current, data);
