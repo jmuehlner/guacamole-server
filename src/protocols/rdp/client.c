@@ -95,6 +95,8 @@ static void* guac_rdp_sync_pending_user(guac_user* user, void* data) {
 
     guac_rdp_client* rdp_client = (guac_rdp_client*) user->client->data;
 
+    fprintf(stderr, "Syncing user %p\n", (void*) user);
+
     /* Synchronize any audio stream */
     if (rdp_client->audio)
         guac_audio_stream_add_user(rdp_client->audio, user);
