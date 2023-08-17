@@ -21,9 +21,6 @@
 #include <stdint.h>
 #include "local-lock.h"
 
-// no
-#include <stdio.h>
-
 /**
  * The value indicating that the current thread holds neither the read or write
  * locks.
@@ -95,8 +92,6 @@ static void* get_value_from_flag_and_count(
 
 void guac_acquire_write_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key) {
 
-    fprintf(stderr, "%lu: entering %s()\n", pthread_self(), __func__);
-
     uintptr_t key_value = (uintptr_t) pthread_getspecific(key);
     uintptr_t flag = get_lock_flag(key_value);
     uintptr_t count = get_lock_count(key_value);
@@ -107,7 +102,6 @@ void guac_acquire_write_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key
                 flag, count + 1));
 
         /* This thread already has the lock */
-        fprintf(stderr, "%lu: leaving %s()\n", pthread_self(), __func__);
         return;
     }
 
@@ -128,13 +122,9 @@ void guac_acquire_write_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key
     pthread_setspecific(key, get_value_from_flag_and_count(
             GUAC_LOCAL_LOCK_WRITE_LOCK, count + 1));
 
-    fprintf(stderr, "%lu: leaving %s()\n", pthread_self(), __func__);
-
 }
 
 void guac_acquire_read_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key) {
-
-    fprintf(stderr, "%lu: entering %s()\n", pthread_self(), __func__);
 
     uintptr_t key_value = (uintptr_t) pthread_getspecific(key);
     uintptr_t flag = get_lock_flag(key_value);
@@ -151,7 +141,6 @@ void guac_acquire_read_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key)
                 flag, count + 1));
 
         /* This thread already has the lock */
-        fprintf(stderr, "%lu: leaving %s()\n", pthread_self(), __func__);
         return;
     }
 
@@ -162,13 +151,9 @@ void guac_acquire_read_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key)
     pthread_setspecific(key, get_value_from_flag_and_count(
                 GUAC_LOCAL_LOCK_READ_LOCK, 1));
 
-    fprintf(stderr, "%lu: leaving %s()\n", pthread_self(), __func__);
-
 }
 
 void guac_release_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key) {
-
-    fprintf(stderr, "%lu: entering %s()\n", pthread_self(), __func__);
 
     uintptr_t key_value = (uintptr_t) pthread_getspecific(key);
     uintptr_t flag = get_lock_flag(key_value);
@@ -186,22 +171,15 @@ void guac_release_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key) {
         if (count == 1)
             pthread_rwlock_unlock(lock);
 
-        else
-            fprintf(stderr, "Double releasing lock %p - bad news!\n", (void*) lock);
-
-
         /* Set the flag that the current thread holds no locks */
         pthread_setspecific(key, get_value_from_flag_and_count(
                 GUAC_LOCAL_LOCK_NO_LOCK, 0));
 
-        fprintf(stderr, "%lu: leaving %s()\n", pthread_self(), __func__);
         return;
     }
 
     /* Do not release the lock since it's still in use - just decrement */
     pthread_setspecific(key, get_value_from_flag_and_count(
             flag, count - 1));
-
-    fprintf(stderr, "%lu: leaving %s()\n", pthread_self(), __func__);
 
 }
