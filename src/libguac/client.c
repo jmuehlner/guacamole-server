@@ -250,7 +250,7 @@ guac_client* guac_client_alloc() {
     pthread_rwlockattr_init(&lock_attributes);
     pthread_rwlockattr_setpshared(&lock_attributes, PTHREAD_PROCESS_SHARED);
     pthread_rwlock_init(&(client->__users_lock.lock), &lock_attributes);
-    pthread_rwlock_init(&(client->__pending_users_lock.lock), NULL);
+    pthread_rwlock_init(&(client->__pending_users_lock.lock), &lock_attributes);
 
     /* Initialize the write lock flags to 0, as threads won't have yet */
     pthread_key_create(&(client->__users_lock.key), (void *) 0);
