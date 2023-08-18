@@ -62,6 +62,23 @@ typedef struct guac_local_lock {
 } guac_local_lock;
 
 /**
+ * Initialize the provided guac local lock. The lock will be configured to be
+ * visible to child processes.
+ *
+ * @param lock
+ *     The guac local lock to be initialized.
+ */
+void guac_init_local_lock(guac_local_lock* lock);
+
+/**
+ * Clean up and destroy the provided guac local lock.
+ *
+ * @param lock
+ *     The guac local lock to be destroyed.
+ */
+void guac_destroy_local_lock(guac_local_lock* lock);
+
+/**
  * Aquire the write lock for the provided guac local lock, if the key does not
  * indicate that the write lock is already acquired. If the key indicates that
  * the read lock is already acquired, the read lock will be dropped before the

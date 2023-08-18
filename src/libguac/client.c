@@ -207,7 +207,6 @@ static void guac_client_promote_pending_users(union sigval data) {
 guac_client* guac_client_alloc() {
 
     int i;
-    pthread_rwlockattr_t lock_attributes;
 
     /* Allocate new client */
     guac_client* client = malloc(sizeof(guac_client));
@@ -245,12 +244,9 @@ guac_client* guac_client_alloc() {
         client->__output_streams[i].index = GUAC_CLIENT_CLOSED_STREAM_INDEX;
     }
 
-
     /* Init locks */
-    pthread_rwlockattr_init(&lock_attributes);
-    pthread_rwlockattr_setpshared(&lock_attributes, PTHREAD_PROCESS_SHARED);
-    pthread_rwlock_init(&(client->__users_lock.lock), &lock_attributes);
-    pthread_rwlock_init(&(client->__pending_users_lock.lock), &lock_attributes);
+    guac_init_local_lock(&(client->__users_lock));
+    guac_init_local_lock(&(client->__pending_users_lock));
 
     /* Initialize the write lock flags to 0, as threads won't have yet */
     pthread_key_create(&(client->__users_lock.key), (void *) 0);
@@ -310,11 +306,9 @@ void guac_client_free(guac_client* client) {
     if (client->__pending_users_timer != NULL)
         timer_delete(client->__pending_users_timer);
 
-    pthread_rwlock_destroy(&(client->__users_lock.lock));
-    pthread_key_delete(client->__users_lock.key);
-
-    pthread_rwlock_destroy(&(client->__pending_users_lock.lock));
-    pthread_key_delete(client->__pending_users_lock.key);
+    /* Destroy the reenrant read-write locks */
+    guac_destroy_local_lock(&(client->__users_lock));
+    guac_destroy_local_lock(&(client->__pending_users_lock));
 
     free(client->connection_id);
     free(client);

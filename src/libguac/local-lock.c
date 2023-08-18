@@ -37,6 +37,39 @@
  */
 #define GUAC_LOCAL_LOCK_WRITE_LOCK 2
 
+void guac_init_local_lock(guac_local_lock* lock) {
+
+    /* Configure to allow sharing this lock with child processes */
+    pthread_rwlockattr_t lock_attributes;
+    pthread_rwlockattr_init(&lock_attributes);
+    pthread_rwlockattr_setpshared(&lock_attributes, PTHREAD_PROCESS_SHARED);
+
+    /* Initialize the rwlock */
+    pthread_rwlock_init(&(lock->lock), &lock_attributes);
+
+    /* Initialize the  flags to 0, as threads won't have acquired it yet */
+    pthread_key_create(&(lock->key), (void *) 0);
+
+}
+
+void guac_destroy_local_lock(guac_local_lock* lock) {
+
+    /* Destroy the rwlock */
+    pthread_rwlock_destroy(&(lock->lock));
+
+    /* Destroy the thread-local key */
+    pthread_key_delete(lock->key);
+
+}
+
+/**
+ * Clean up and destroy the provided guac local lock.
+ *
+ * @param lock
+ *     The guac local lock to be destroyed.
+ */
+void guac_destroy_local_lock(guac_local_lock* lock);
+
 /**
  * Extract and return the flag indicating which lock is held, if any, from the
  * provided key value. The flag is always stored in the least-significant
