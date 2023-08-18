@@ -90,15 +90,15 @@ static void* get_value_from_flag_and_count(
     return (void*) ((flag & 0xF) | count << 4);
 }
 
-void guac_acquire_write_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key) {
+void guac_acquire_write_lock(guac_local_lock* local_lock) {
 
-    uintptr_t key_value = (uintptr_t) pthread_getspecific(key);
+    uintptr_t key_value = (uintptr_t) pthread_getspecific(local_lock->key);
     uintptr_t flag = get_lock_flag(key_value);
     uintptr_t count = get_lock_count(key_value);
 
     /* If the current thread already holds the write lock, increment the count */
     if (flag == GUAC_LOCAL_LOCK_WRITE_LOCK) {
-        pthread_setspecific(key, get_value_from_flag_and_count(
+        pthread_setspecific(local_lock->key, get_value_from_flag_and_count(
                 flag, count + 1));
 
         /* This thread already has the lock */
@@ -113,20 +113,20 @@ void guac_acquire_write_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key
      * shouldn't cause any issues, however.
      */
     if (key_value == GUAC_LOCAL_LOCK_READ_LOCK)
-        pthread_rwlock_unlock(lock);
+        pthread_rwlock_unlock(&(local_lock->lock));
 
     /* Acquire the write lock */
-    pthread_rwlock_wrlock(lock);
+    pthread_rwlock_wrlock(&(local_lock->lock));
 
     /* Mark that the current thread has the lock, and increment the count */
-    pthread_setspecific(key, get_value_from_flag_and_count(
+    pthread_setspecific(local_lock->key, get_value_from_flag_and_count(
             GUAC_LOCAL_LOCK_WRITE_LOCK, count + 1));
 
 }
 
-void guac_acquire_read_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key) {
+void guac_acquire_read_lock(guac_local_lock* local_lock) {
 
-    uintptr_t key_value = (uintptr_t) pthread_getspecific(key);
+    uintptr_t key_value = (uintptr_t) pthread_getspecific(local_lock->key);
     uintptr_t flag = get_lock_flag(key_value);
     uintptr_t count = get_lock_count(key_value);
 
@@ -137,7 +137,7 @@ void guac_acquire_read_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key)
     ) {
 
         /* Increment the depth counter */
-        pthread_setspecific(key, get_value_from_flag_and_count(
+        pthread_setspecific(local_lock->key, get_value_from_flag_and_count(
                 flag, count + 1));
 
         /* This thread already has the lock */
@@ -145,17 +145,17 @@ void guac_acquire_read_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key)
     }
 
     /* Acquire the lock */
-    pthread_rwlock_rdlock(lock);
+    pthread_rwlock_rdlock(&(local_lock->lock));
 
     /* Set the flag that the current thread has the read lock */
-    pthread_setspecific(key, get_value_from_flag_and_count(
+    pthread_setspecific(local_lock->key, get_value_from_flag_and_count(
                 GUAC_LOCAL_LOCK_READ_LOCK, 1));
 
 }
 
-void guac_release_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key) {
+void guac_release_lock(guac_local_lock* local_lock) {
 
-    uintptr_t key_value = (uintptr_t) pthread_getspecific(key);
+    uintptr_t key_value = (uintptr_t) pthread_getspecific(local_lock->key);
     uintptr_t flag = get_lock_flag(key_value);
     uintptr_t count = get_lock_count(key_value);
 
@@ -169,17 +169,17 @@ void guac_release_lock_if_needed(pthread_rwlock_t* lock, pthread_key_t key) {
          * of double release would indicate a logic error in the caller.
          */
         if (count == 1)
-            pthread_rwlock_unlock(lock);
+            pthread_rwlock_unlock(&(local_lock->lock));
 
         /* Set the flag that the current thread holds no locks */
-        pthread_setspecific(key, get_value_from_flag_and_count(
+        pthread_setspecific(local_lock->key, get_value_from_flag_and_count(
                 GUAC_LOCAL_LOCK_NO_LOCK, 0));
 
         return;
     }
 
     /* Do not release the lock since it's still in use - just decrement */
-    pthread_setspecific(key, get_value_from_flag_and_count(
+    pthread_setspecific(local_lock->key, get_value_from_flag_and_count(
             flag, count - 1));
 
 }

@@ -30,6 +30,7 @@
 #include "client-types.h"
 #include "client-constants.h"
 #include "layer-types.h"
+#include "local-lock.h"
 #include "object-types.h"
 #include "pool-types.h"
 #include "socket-types.h"
@@ -40,7 +41,6 @@
 
 #include <cairo/cairo.h>
 
-#include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <time.h>
@@ -164,13 +164,7 @@ struct guac_client {
      * Lock which is acquired when the users list is being manipulated, or when
      * the users list is being iterated.
      */
-    pthread_rwlock_t __users_lock;
-
-    /**
-     * A key to access a thread-local property tracking any ownership of the
-     * users lock by the current thread. Internal use only.
-     */
-    pthread_key_t  __users_lock_key;
+    guac_local_lock __users_lock;
 
     /**
      * The first user within the list of all connected users, or NULL if no
@@ -182,13 +176,7 @@ struct guac_client {
      * Lock which is acquired when the pending users list is being manipulated,
      * or when the pending users list is being iterated.
      */
-    pthread_rwlock_t __pending_users_lock;
-
-    /**
-     * A key to access a thread-local property tracking any ownership of the
-     * pending users lock by the current thread. Internal use only.
-     */
-    pthread_key_t  __pending_users_lock_key;
+    guac_local_lock __pending_users_lock;
 
     /**
      * A timer that will periodically synchronize the list of pending users,
