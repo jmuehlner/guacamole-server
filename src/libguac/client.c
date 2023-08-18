@@ -153,22 +153,15 @@ static void guac_client_promote_pending_users(union sigval data) {
     if (atomic_flag_test_and_set(&(client->__pending_timer_event_active)))
         return;
 
-    /*
-     * Acquire the lock for reading and modifying the list of users, and to
-     * block the broadcast socket to ensure that all updates from here one out
-     * will go to these newly promoted users
-     */
-    guac_acquire_write_lock(&(client->__users_lock));
-
     /* Acquire the lock for reading and modifying the list of pending users */
     guac_acquire_write_lock(&(client->__pending_users_lock));
-
-    /* The number of users being promoted from pending */
-    int users_promoted = 0;
 
     /* Run the pending join handler, if one is defined */
     if (client->join_pending_handler)
         client->join_pending_handler(client);
+
+    /* The number of users being promoted from pending */
+    int users_promoted = 0;
 
     /* The first pending user in the list, if any */
     guac_user* first_user = client->__pending_users;
@@ -186,6 +179,9 @@ static void guac_client_promote_pending_users(union sigval data) {
 
     /* Release the lock */
     guac_release_lock(&(client->__pending_users_lock));
+
+    /* Acquire the lock for reading and modifying the list of full users. */
+    guac_acquire_write_lock(&(client->__users_lock));
 
     /* If any users were removed from the pending list, promote them now */
     if (last_user != NULL) {
