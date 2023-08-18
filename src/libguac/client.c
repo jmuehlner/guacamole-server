@@ -42,6 +42,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -148,6 +149,10 @@ static void guac_client_promote_pending_users(union sigval data) {
 
     guac_client* client = (guac_client*) data.sival_ptr;
 
+    /* Do not start if the previous promotion event is still running */
+    if (atomic_flag_test_and_set(&(client->__pending_timer_event_active)))
+        return;
+
     /*
      * Acquire the lock for reading and modifying the list of users, and to
      * block the broadcast socket to ensure that all updates from here one out
@@ -197,6 +202,9 @@ static void guac_client_promote_pending_users(union sigval data) {
     }
 
     guac_release_lock(&(client->__users_lock));
+
+    /* Mark the timer event as complete so the next instance can run */
+    atomic_flag_clear(&(client->__pending_timer_event_active));
 
 }
 
@@ -257,6 +265,9 @@ guac_client* guac_client_alloc() {
 
     /* Set up socket to broadcast to all users */
     client->socket = guac_socket_broadcast(client);
+
+    /* Set the timer event thread as initially inactive, since it hasn't run */
+    atomic_flag_clear(&(client->__pending_timer_event_active));
 
     return client;
 

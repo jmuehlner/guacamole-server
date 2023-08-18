@@ -43,6 +43,7 @@
 
 #include <signal.h>
 #include <stdarg.h>
+#include <stdatomic.h>
 #include <time.h>
 
 struct guac_client {
@@ -204,6 +205,12 @@ struct guac_client {
      * first user joins the connection.
      */
     struct itimerspec __pending_users_time_spec;
+
+    /**
+     * A flag that indicates whether the pending users timer event thread is
+     * currently running.
+     */
+    volatile atomic_flag __pending_timer_event_active;
 
     /**
      * The first user within the list of connected users who have not yet had
