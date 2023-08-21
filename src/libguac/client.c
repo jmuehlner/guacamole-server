@@ -168,8 +168,12 @@ static void guac_client_promote_pending_users(union sigval data) {
 
     /* The final user in the list, if any */
     guac_user* last_user = first_user;
-    while (last_user != NULL) {
-        last_user = last_user->__next;
+
+    /* Iterate through the pending users to find the final user */
+    guac_user* user = first_user;
+    while (user != NULL) {
+        last_user = user;
+        user = user->__next;
         users_promoted++;
     }
 
