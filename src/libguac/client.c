@@ -421,8 +421,10 @@ static int guac_client_start_pending_users_timer(guac_client* client) {
     pthread_mutex_lock(&(client->__pending_users_timer_mutex));
 
     /* Return success if the timer is already created and running */
-    if (client->__pending_users_timer != NULL)
+    if (client->__pending_users_timer != NULL) {
+        pthread_mutex_unlock(&(client->__pending_users_timer_mutex));
         return 0;
+    }
 
     /* Configure the timer to synchronize and clear the pending users */
     client->__pending_users_timer_signal_config.sigev_notify = SIGEV_THREAD;
