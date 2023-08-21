@@ -160,9 +160,6 @@ static void guac_client_promote_pending_users(union sigval data) {
     if (client->join_pending_handler)
         client->join_pending_handler(client);
 
-    /* The number of users being promoted from pending */
-    int users_promoted = 0;
-
     /* The first pending user in the list, if any */
     guac_user* first_user = client->__pending_users;
 
@@ -174,15 +171,10 @@ static void guac_client_promote_pending_users(union sigval data) {
     while (user != NULL) {
         last_user = user;
         user = user->__next;
-        users_promoted++;
     }
 
     /* Mark the list as empty */
     client->__pending_users = NULL;
-    client->pending_users = 0;
-
-    /* Release the lock */
-    guac_release_lock(&(client->__pending_users_lock));
 
     /* Acquire the lock for reading and modifying the list of full users. */
     guac_acquire_write_lock(&(client->__users_lock));
@@ -197,11 +189,13 @@ static void guac_client_promote_pending_users(union sigval data) {
         last_user->__next = client->__users;
         client->__users = first_user;
 
-        client->connected_users += users_promoted;
-
     }
 
     guac_release_lock(&(client->__users_lock));
+
+    /* Release the lock (this is done AFTER updating the non-pending user list
+     * to ensure that all users are always on exactly one of these lists) */
+    guac_release_lock(&(client->__pending_users_lock));
 
     /* Mark the timer event as complete so the next instance can run */
     atomic_flag_clear(&(client->__pending_timer_event_active));
@@ -401,8 +395,8 @@ static void guac_client_add_pending_user(
 
     client->__pending_users = user;
 
-    /* Increment the pending user count */
-    client->pending_users++;
+    /* Increment the user count */
+    client->connected_users++;
 
     /* Release the lock */
     guac_release_lock(&(client->__pending_users_lock));
@@ -511,59 +505,28 @@ int guac_client_add_user(guac_client* client, guac_user* user, int argc, char** 
 void guac_client_remove_user(guac_client* client, guac_user* user) {
 
     guac_acquire_write_lock(&(client->__users_lock));
-
-    /* First, remove from the list of users if present (not pending) */
-    if (
-            user->__next != NULL ||
-            user->__prev != NULL ||
-            client->__users == user) {
-
-        /* Update prev / head */
-        if (user->__prev != NULL)
-            user->__prev->__next = user->__next;
-        else
-            client->__users = user->__next;
-
-        /* Update next */
-        if (user->__next != NULL)
-            user->__next->__prev = user->__prev;
-
-        client->connected_users--;
-
-        /* Update owner pointer if user was owner */
-        if (user->owner)
-            client->__owner = NULL;
-
-    }
-
-    guac_release_lock(&(client->__users_lock));
-
     guac_acquire_write_lock(&(client->__pending_users_lock));
 
-    /* Next, remove the user from the pending list, if present */
-    if (
-            user->__next != NULL ||
-            user->__prev != NULL ||
-            client->__pending_users == user) {
+    /* Update prev / head */
+    if (user->__prev != NULL)
+        user->__prev->__next = user->__next;
+    else if (client->__users == user)
+        client->__users = user->__next;
+    else if (client->__pending_users == user)
+        client->__pending_users = user->__next;
 
-        if (user->__prev != NULL)
-            user->__prev->__next = user->__next;
-        else
-            client->__pending_users = user->__next;
+    /* Update next */
+    if (user->__next != NULL)
+        user->__next->__prev = user->__prev;
 
-        /* Update next */
-        if (user->__next != NULL)
-            user->__next->__prev = user->__prev;
+    client->connected_users--;
 
-        client->pending_users--;
-
-        /* Update owner pointer if user was owner */
-        if (user->owner)
-            client->__owner = NULL;
-
-    }
+    /* Update owner pointer if user was owner */
+    if (user->owner)
+        client->__owner = NULL;
 
     guac_release_lock(&(client->__pending_users_lock));
+    guac_release_lock(&(client->__users_lock));
 
     /* Update owner of user having left the connection. */
     if (!user->owner)

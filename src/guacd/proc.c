@@ -98,7 +98,7 @@ static void* guacd_user_thread(void* data) {
     guac_user_handle_connection(user, GUACD_USEC_TIMEOUT);
 
     /* Stop client and prevent future users if all users are disconnected */
-    if (client->connected_users == 0 && client->pending_users == 0) {
+    if (client->connected_users == 0) {
         guacd_log(GUAC_LOG_INFO, "Last user of connection \"%s\" disconnected", client->connection_id);
         guacd_proc_stop(proc);
     }

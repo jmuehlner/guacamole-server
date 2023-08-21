@@ -344,7 +344,7 @@ int guac_user_handle_connection(guac_user* user, int usec_timeout) {
 
         guac_client_log(client, GUAC_LOG_INFO, "User \"%s\" joined connection "
                 "\"%s\" (%i users now present)", user->user_id,
-                client->connection_id, client->connected_users + client->pending_users);
+                client->connection_id, client->connected_users);
         if (strcmp(parser->argv[0],"") != 0) {
             guac_client_log(client, GUAC_LOG_DEBUG, "Client is using protocol "
                     "version \"%s\"", parser->argv[0]);
@@ -362,7 +362,7 @@ int guac_user_handle_connection(guac_user* user, int usec_timeout) {
         /* Remove/free user */
         guac_client_remove_user(client, user);
         guac_client_log(client, GUAC_LOG_INFO, "User \"%s\" disconnected (%i "
-                "users remain)", user->user_id, client->connected_users + client->pending_users);
+                "users remain)", user->user_id, client->connected_users);
 
     }
     
