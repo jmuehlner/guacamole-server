@@ -301,7 +301,7 @@ void guac_client_free(guac_client* client) {
 
     /* Destroy the pending users timer */
     pthread_mutex_destroy(&(client->__pending_users_timer_mutex));
-    if (client->__pending_users_timer != NULL)
+    if (client->__pending_users_timer_running != 0)
         timer_delete(client->__pending_users_timer);
 
     /* Destroy the reenrant read-write locks */
@@ -421,7 +421,7 @@ static int guac_client_start_pending_users_timer(guac_client* client) {
     pthread_mutex_lock(&(client->__pending_users_timer_mutex));
 
     /* Return success if the timer is already created and running */
-    if (client->__pending_users_timer != NULL) {
+    if (client->__pending_users_timer_running != 0) {
         pthread_mutex_unlock(&(client->__pending_users_timer_mutex));
         return 0;
     }
@@ -451,11 +451,11 @@ static int guac_client_start_pending_users_timer(guac_client* client) {
             client->__pending_users_timer, 0,
             &(client->__pending_users_time_spec), NULL) < 0) {
         timer_delete(client->__pending_users_timer);
-        client->__pending_users_timer = NULL;
         pthread_mutex_unlock(&(client->__pending_users_timer_mutex));
         return 1;
     }
 
+    client->__pending_users_timer_running = 1;
     pthread_mutex_unlock(&(client->__pending_users_timer_mutex));
     return 0;
 

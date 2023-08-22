@@ -188,6 +188,12 @@ struct guac_client {
     timer_t __pending_users_timer;
 
     /**
+     * Non-zero if the pending users timer is configured and running, or zero
+     * otherwise.
+     */
+    int __pending_users_timer_running;
+
+    /**
      * A mutex that must be acquired before modifying the pending users timer.
      */
     pthread_mutex_t __pending_users_timer_mutex;
