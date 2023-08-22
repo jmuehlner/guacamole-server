@@ -49,14 +49,18 @@
 typedef int guac_client_free_handler(guac_client* client);
 
 /**
- * Handler that will run before pending users are promoted to full users.
- * Any required operations for pending users should be applied using
- * guac_client_foreach_pending_user().
+ * Handler that will run before immediately before pending users are promoted
+ * to full users, using the provided broadcast socket to communicate with the
+ * pending users as needed.
  *
  * @param client
  *     The client whose handler was invoked.
+ *
+ * @param broadcast_socket
+ *     The socket that should be used to communicate with the pending users.
  */
-typedef void guac_join_pending_handler(guac_client* client);
+typedef void guac_join_pending_handler(
+        guac_client* client, guac_socket* broadcast_socket);
 
 /**
  * Handler for logging messages related to a given guac_client instance.
@@ -88,6 +92,23 @@ typedef void guac_client_log_handler(guac_client* client,
  *     Zero on success, non-zero if initialization fails for any reason.
  */
 typedef int guac_client_init_handler(guac_client* client);
+
+/**
+ * A function that will broadcast arbitrary data to a subset of users for
+ * the provided client, using the provided user callback for any user-specific
+ * operations.
+ *
+ * @param client
+ *     The guac_client associated with the users to broadcast to.
+ *
+ * @param callback
+ *     A callback that should be invoked with each broadcasted user.
+ *
+ * @param data
+ *     Arbitrary data that may be used to broadcast to the subset of users.
+ */
+typedef void guac_client_broadcast_handler(
+        guac_client* client, guac_user_callback* callback, void* data);
 
 #endif
 

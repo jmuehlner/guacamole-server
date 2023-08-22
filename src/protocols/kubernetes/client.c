@@ -110,12 +110,25 @@ static void* guac_kubernetes_sync_pending_user(guac_user* user, void* data) {
  *
  * @param client
  *     The client whose pending users are about to be promoted.
+ *
+ * @param broadcast_socket
+ *     A socket that will broadcast to the pending users.
  */
-static void guac_kubernetes_join_pending_handler(guac_client* client) {
+static void guac_kubernetes_join_pending_handler(
+        guac_client* client, guac_socket* broadcast_socket) {
 
     /* Synchronize each user one at a time */
     guac_client_foreach_pending_user(
         client, guac_kubernetes_sync_pending_user, NULL);
+
+    guac_kubernetes_client* kubernetes_client =
+        (guac_kubernetes_client*) client->data;
+
+    guac_terminal_dup(kubernetes_client->term, user, user->socket);
+    guac_kubernetes_send_current_argv(user, kubernetes_client);
+    guac_socket_flush(user->socket);
+
+    return NULL;
 
 }
 

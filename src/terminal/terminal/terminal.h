@@ -619,6 +619,9 @@ int guac_terminal_sendf(guac_terminal* term, const char* format, ...);
  * connection. All instructions necessary to replicate state are sent over the
  * given socket.
  *
+ * @deprecated The guac_terminal_sync_pending_users method should be used for
+ * syncing newly joined users for a connection.
+ *
  * @param term
  *     The terminal emulator associated with the connection being joined.
  *
@@ -631,6 +634,18 @@ int guac_terminal_sendf(guac_terminal* term, const char* format, ...);
  */
 void guac_terminal_dup(guac_terminal* term, guac_user* user,
         guac_socket* socket);
+
+/**
+ * Synchronizes the current display state for all the pending users of a given
+ * client. The pending user socket will be used to synchronize the users.
+ *
+ * @param term
+ *     The terminal whose state should be synchronized to all pending users.
+ *
+ * @param client
+ *     The client whose pending users should be synchronized.
+ */
+void guac_terminal_sync_pending_users(guac_terminal* term, guac_client* client);
 
 /**
  * Resize the client display and terminal to the given pixel dimensions.
