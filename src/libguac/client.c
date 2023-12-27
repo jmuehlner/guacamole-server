@@ -285,6 +285,11 @@ guac_client* guac_client_alloc() {
     /* Init new client */
     memset(client, 0, sizeof(guac_client));
 
+    /* Init internal struct */
+    guac_client_internal* internal = malloc(sizeof(guac_client_internal));
+    memset(internal, 0, sizeof(guac_client_internal));
+    client->internal = internal;
+
     client->args = __GUAC_CLIENT_NO_ARGS;
     client->state = GUAC_CLIENT_RUNNING;
     client->last_sent_timestamp = guac_timestamp_current();
@@ -399,6 +404,7 @@ void guac_client_free(guac_client* client) {
     guac_rwlock_destroy(&(client->internal->__users_lock));
     guac_rwlock_destroy(&(client->internal->__pending_users_lock));
 
+    free(client->internal);
     free(client->connection_id);
     free(client);
 }
