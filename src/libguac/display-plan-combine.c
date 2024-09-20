@@ -162,6 +162,12 @@ static int guac_display_plan_should_combine(const guac_display_plan_operation* o
             case GUAC_DISPLAY_PLAN_OPERATION_IMG:
                 return !guac_display_plan_rect_crosses_boundary(&combined);
 
+            /* Image-drawing operations can be combined if doing so wouldn't
+             * exceed the size limits for images (we enforce size limits here
+             * to promote parallelism) */
+            case GUAC_DISPLAY_PLAN_OPERATION_IMG:
+                return !guac_display_plan_rect_crosses_boundary(&combined);
+
             /* Other combinations require more complex logic... (see below) */
             default:
                 break;
