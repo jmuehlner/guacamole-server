@@ -473,7 +473,7 @@ void* guac_display_worker_thread(void* data) {
 
             case GUAC_DISPLAY_PLAN_END_FRAME:
 
-                //fprintf(stderr, "Ending frame after %i ops\n", op_count);
+                fprintf(stderr, "Ending frame after %i ops\n", op_count);
                 op_count = 0;
 
 
