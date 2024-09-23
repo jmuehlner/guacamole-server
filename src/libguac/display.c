@@ -151,7 +151,7 @@ guac_display* guac_display_alloc(guac_client* client) {
                 "processor(s) are available.", cpu_count);
     }
 
-    display->worker_thread_count = cpu_count * GUAC_DISPLAY_CPU_THREAD_FACTOR;
+    display->worker_thread_count = 1;// cpu_count * GUAC_DISPLAY_CPU_THREAD_FACTOR;
     display->worker_threads = guac_mem_alloc(display->worker_thread_count, sizeof(pthread_t));
     guac_client_log(client, GUAC_LOG_INFO, "Graphical updates will be encoded "
             "using %i worker thread(s).", display->worker_thread_count);
@@ -314,6 +314,14 @@ void guac_display_notify_user_moved_mouse(guac_display* display, guac_user* user
 
 guac_display_layer* guac_display_default_layer(guac_display* display) {
     return display->default_layer;
+}
+
+guac_rwlock* guac_display_pending_lock(guac_display* display) {
+    return &display->pending_frame.lock;
+}
+
+guac_rwlock* guac_display_last_lock(guac_display* display) {
+    return &display->last_frame.lock;
 }
 
 guac_display_layer* guac_display_alloc_layer(guac_display* display, int opaque) {

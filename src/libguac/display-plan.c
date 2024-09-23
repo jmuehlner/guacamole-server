@@ -28,6 +28,8 @@
 #include <string.h>
 #include <cairo/cairo.h>
 
+#include <stdio.h>
+
 /**
  * Updates the dirty rect in the given cell to note that a horizontal line of
  * image data at the given location and having the given width has changed
@@ -352,6 +354,24 @@ guac_display_plan* PFW_LFR_guac_display_plan_create(guac_display* display) {
      * queue may become empty while a frame is in progress if the worker
      * threads happen to be processing things quickly. */
     current_op->type = GUAC_DISPLAY_PLAN_END_FRAME;
+
+    guac_rect* rects[added_ops];
+
+    guac_display_plan_operation* op = plan->ops;
+    for (int i = 0; i < added_ops; i++) {
+
+        for (int j = 0; j < (i - 1); j++) {
+            if (guac_rect_intersects(&op->dest, rects[j])) {
+                fprintf(stderr, "(plan) Op #%i (%i): at %i,%i (size %ix%i) intersects op #%i (?): at %i,%i (size %ix%i)\n",
+                i, op->type, op->dest.left, op->dest.top, guac_rect_width(&op->dest), guac_rect_height(&op->dest),
+                j, rects[j]->left, rects[j]->top, guac_rect_width(rects[j]), guac_rect_height(rects[j]));
+            }
+        }
+
+        rects[i] = &op->dest;
+        op++;
+
+    }
 
     return plan;
 

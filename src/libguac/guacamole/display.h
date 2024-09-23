@@ -329,6 +329,10 @@ void guac_display_end_multiple_frames(guac_display* display, int frames);
  */
 guac_display_layer* guac_display_default_layer(guac_display* display);
 
+guac_rwlock* guac_display_pending_lock(guac_display* display);
+
+guac_rwlock* guac_display_last_lock(guac_display* display);
+
 /**
  * Allocates a new layer for the given display. The new layer will initially be
  * a direct child of the display's default layer. When the layer is no longer

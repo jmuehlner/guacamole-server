@@ -607,6 +607,9 @@ void* guac_vnc_client_thread(void* data) {
             guac_timestamp frame_start = guac_timestamp_current();
             do {
 
+                guac_rwlock_acquire_write_lock(guac_display_pending_lock(vnc_client->display));
+                guac_rwlock_acquire_write_lock(guac_display_last_lock(vnc_client->display));
+
                 /* Handle any message received */
                 if (!guac_vnc_handle_messages(vnc_client)) {
                     guac_client_abort(client,
@@ -614,6 +617,9 @@ void* guac_vnc_client_thread(void* data) {
                             "Error handling message from VNC server.");
                     break;
                 }
+
+                guac_rwlock_release_lock(guac_display_pending_lock(vnc_client->display));
+                guac_rwlock_release_lock(guac_display_last_lock(vnc_client->display));
 
                 int frame_duration = guac_timestamp_current() - frame_start;
 

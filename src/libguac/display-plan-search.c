@@ -25,6 +25,8 @@
 #include <string.h>
 #include <stdint.h>
 
+#include <stdio.h>
+
 /**
  * Stores the given operation within the ops_by_hash table of the given display
  * plan based on the given hash value. The hash function applied for storing
