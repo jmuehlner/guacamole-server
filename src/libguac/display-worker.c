@@ -35,9 +35,6 @@
 #include <cairo/cairo.h>
 #include <pthread.h>
 
-#include <stdio.h>
-#include <time.h>
-
 /**
  * Returns a new Cairo surface representing the contents of the given dirty
  * rectangle from the given layer. The returned surface must eventually be
@@ -301,10 +298,6 @@ void* guac_display_worker_thread(void* data) {
     guac_client* client = display->client;
     guac_socket* socket = client->socket;
 
-    guac_rect rects[10000];
-    int types[10000];
-    int op_count = 0;
-
     guac_display_plan_operation op;
     while (guac_fifo_dequeue_and_lock(&display->ops, &op)) {
 
@@ -374,56 +367,14 @@ void* guac_display_worker_thread(void* data) {
                     guac_client_stream_png(client, socket, GUAC_COMP_OVER,
                             layer, dirty->left, dirty->top, rect);
 
-                for (int j = 0; j < (op_count - 1); j++) {
-                    if (guac_rect_intersects(&op.dest, &rects[j])) {
-                        guac_rect intersection = {.left = op.dest.left, .right = op.dest.right, .bottom = op.dest.bottom, .top = op.dest.top };
-                        guac_rect_constrain(&intersection, &rects[j]);
-                        fprintf(stderr, "(worker) Op #%i (%i): at %i,%i (%ix%i) intersects op #%i (%i): at %i,%i (%ix%i) - intersection %i,%i (%ix%i)\n",
-                        op_count, op.type, op.dest.left, op.dest.top, guac_rect_width(&op.dest), guac_rect_height(&op.dest),
-                        j, types[j], rects[j].left, rects[j].top, guac_rect_width(&rects[j]), guac_rect_height(&rects[j]),
-                        intersection.left, intersection.top, guac_rect_width(&intersection), guac_rect_height(&intersection));
-                    }
-                }
-
-                rects[op_count].top = op.dest.top;
-                rects[op_count].left = op.dest.left;
-                rects[op_count].right = op.dest.right;
-                rects[op_count].bottom = op.dest.bottom;
-                types[op_count] = op.type;
-                op_count++;
-
                 cairo_surface_destroy(rect);
                 break;
 
             case GUAC_DISPLAY_PLAN_OPERATION_COPY:
-                // fprintf(stderr, "moved by: %i,%i from %i,%i to %i,%i (size %ix%i)\n",
-                //         op.dest.left - op.src.layer_rect.rect.left, op.dest.top - op.src.layer_rect.rect.top,
-                //         op.src.layer_rect.rect.left, op.src.layer_rect.rect.top,
-                //         op.dest.left, op.dest.top,
-                //         guac_rect_width(&op.src.layer_rect.rect), guac_rect_height(&op.src.layer_rect.rect));
                 guac_protocol_send_copy(client->socket, op.src.layer_rect.layer,
                         op.src.layer_rect.rect.left, op.src.layer_rect.rect.top,
                         guac_rect_width(&op.src.layer_rect.rect), guac_rect_height(&op.src.layer_rect.rect),
                         GUAC_COMP_OVER, display_layer->layer, op.dest.left, op.dest.top);
-
-                for (int j = 0; j < (op_count - 1); j++) {
-                    if (guac_rect_intersects(&op.dest, &rects[j])) {
-                        guac_rect intersection = {.left = op.dest.left, .right = op.dest.right, .bottom = op.dest.bottom, .top = op.dest.top };
-                        guac_rect_constrain(&intersection, &rects[j]);
-                        fprintf(stderr, "(worker) Op #%i (%i): at %i,%i (%ix%i) intersects op #%i (%i): at %i,%i (%ix%i) - intersection %i,%i (%ix%i)\n",
-                        op_count, op.type, op.dest.left, op.dest.top, guac_rect_width(&op.dest), guac_rect_height(&op.dest),
-                        j, types[j], rects[j].left, rects[j].top, guac_rect_width(&rects[j]), guac_rect_height(&rects[j]),
-                        intersection.left, intersection.top, guac_rect_width(&intersection), guac_rect_height(&intersection));
-                    }
-                }
-
-                rects[op_count].top = op.dest.top;
-                rects[op_count].left = op.dest.left;
-                rects[op_count].right = op.dest.right;
-                rects[op_count].bottom = op.dest.bottom;
-                types[op_count] = op.type;
-                op_count++;
-
                 break;
 
             case GUAC_DISPLAY_PLAN_OPERATION_RECT:
@@ -447,35 +398,12 @@ void* guac_display_worker_thread(void* data) {
                         red, green, blue, alpha);
 
                 pthread_mutex_unlock(&display->op_path_lock);
-
-                for (int j = 0; j < (op_count - 1); j++) {
-                    if (guac_rect_intersects(&op.dest, &rects[j])) {
-                        guac_rect intersection = {.left = op.dest.left, .right = op.dest.right, .bottom = op.dest.bottom, .top = op.dest.top };
-                        guac_rect_constrain(&intersection, &rects[j]);
-                        fprintf(stderr, "(worker) Op #%i (%i): at %i,%i (%ix%i) intersects op #%i (%i): at %i,%i (%ix%i) - intersection %i,%i (%ix%i)\n",
-                        op_count, op.type, op.dest.left, op.dest.top, guac_rect_width(&op.dest), guac_rect_height(&op.dest),
-                        j, types[j], rects[j].left, rects[j].top, guac_rect_width(&rects[j]), guac_rect_height(&rects[j]),
-                        intersection.left, intersection.top, guac_rect_width(&intersection), guac_rect_height(&intersection));
-                    }
-                }
-
-                rects[op_count].top = op.dest.top;
-                rects[op_count].left = op.dest.left;
-                rects[op_count].right = op.dest.right;
-                rects[op_count].bottom = op.dest.bottom;
-                types[op_count] = op.type;
-                op_count++;
-
                 break;
 
             case GUAC_DISPLAY_PLAN_OPERATION_NOP:
                 break;
 
             case GUAC_DISPLAY_PLAN_END_FRAME:
-
-                fprintf(stderr, "Ending frame after %i ops\n", op_count);
-                op_count = 0;
-
 
                 guac_fifo_lock(&display->ops);
                 int other_workers_busy = (display->active_workers > 1);

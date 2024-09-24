@@ -22,8 +22,6 @@
 #include "guacamole/display.h"
 #include "guacamole/rect.h"
 
-#include <stdio.h>
-
 /**
  * Returns whether the given rectangle crosses the boundaries of any two
  * adjacent cells in a grid, where each cell in the grid is
@@ -221,36 +219,9 @@ static int guac_display_plan_combine_if_improved(guac_display_plan_operation* op
     if (op_a == op_b)
         return 0;
 
-    guac_rect combined = op_a->dest;
-    guac_rect_extend(&combined, &op_b->dest);
-
-    int op_a_width      = guac_rect_width( &op_a->dest);
-    int op_a_height     = guac_rect_height(&op_a->dest);
-    int op_b_width      = guac_rect_width( &op_b->dest);
-    int op_b_height     = guac_rect_height(&op_b->dest);
-    int combined_width  = guac_rect_width(&combined);
-    int combined_height = guac_rect_height(&combined);
-    int op_a_area       = op_a_width * op_a_height;
-    int op_b_area       = op_b_width * op_b_height;
-    int combined_area   = combined_width * combined_height;
-
-    fprintf(stderr, "Checking op rects %i,%i (%ix%i - type %i) and %i,%i (%ix%i - type %i) to make %i,%i (%ix%i)",
-            op_a->dest.left, op_a->dest.top, op_a_width, op_a_height, op_a->type,
-            op_b->dest.left, op_b->dest.top, op_b_width, op_b_height, op_b->type,
-            combined.left, combined.top, combined_width, guac_rect_height(&combined));
-
-    int area_diff = combined_area - (op_a_area + op_b_area);
-
     /* Combine any adjacent operations that match the combination criteria
      * (combining produces a net lower cost) */
     if (guac_display_plan_should_combine(op_a, op_b)) {
-
-        if (area_diff != 0) {
-            fprintf(stderr, ". Combined. Area increased by %i pixels\n", area_diff);
-        }
-
-        else
-            fprintf(stderr, ". Combined. Area stays the same\n");
 
         guac_rect_extend(&op_a->dest, &op_b->dest);
 
@@ -273,8 +244,6 @@ static int guac_display_plan_combine_if_improved(guac_display_plan_operation* op
         return 1;
 
     }
-
-    fprintf(stderr, ". Did not combine.\n");
 
     return 0;
 
